@@ -506,6 +506,7 @@ class RemoteFilesystem
         }
 
         if (false === $result) {
+            echo "false===result\n";
             $e = new TransportException('The "'.$this->fileUrl.'" file could not be downloaded: '.$errorMessage, $errorCode);
             if (!empty($http_response_header[0])) {
                 $e->setHeaders($http_response_header);
@@ -731,6 +732,7 @@ class RemoteFilesystem
         }
 
         if (!$this->retry) {
+            echo "this->retry\n";
             $e = new TransportException('The "'.$this->fileUrl.'" file could not be downloaded, got redirect without Location ('.$http_response_header[0].')');
             $e->setHeaders($http_response_header);
             $e->setResponse($this->decodeResult($result, $http_response_header));

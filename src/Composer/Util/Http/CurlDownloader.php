@@ -443,6 +443,7 @@ class CurlDownloader
             return $targetUrl;
         }
 
+        echo "handleRedirect\n";
         throw new TransportException('The "'.$job['url'].'" file could not be downloaded, got redirect without Location ('.$response->getStatusMessage().')');
     }
 
@@ -511,6 +512,7 @@ class CurlDownloader
             @unlink($job['filename'].'~');
         }
 
+        echo "failResponse";
         return new TransportException('The "'.$job['url'].'" file could not be downloaded ('.$errorMessage.')', $response->getStatusCode());
     }
 
