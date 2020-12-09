@@ -390,8 +390,9 @@ class CurlDownloader
                 call_user_func($job['reject'], $e);
             }
         }
-        echo "Main loop exit\n";
+
         foreach ($this->jobs as $i => $curlHandle) {
+            echo "handle things\n";
             if (!isset($this->jobs[$i])) {
                 continue;
             }
