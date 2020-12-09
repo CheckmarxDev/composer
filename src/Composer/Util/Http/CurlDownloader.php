@@ -354,7 +354,7 @@ class CurlDownloader
                 if ($statusCode >= 400 && $statusCode <= 599) {
                     // JoaoD fix
                     echo "Skipping\n";
-                    return;
+                    continue;
                     //throw $this->failResponse($job, $response, $response->getStatusMessage());
                 }
 
