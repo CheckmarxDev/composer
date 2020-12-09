@@ -351,7 +351,6 @@ class CurlDownloader
                 }
 
                 // fail 4xx and 5xx responses and capture the response
-                echo "$statusCode\n";
                 if ($statusCode >= 400 && $statusCode <= 599) {
                     // JoaoD fix
                     echo "Skipping\n";
@@ -391,7 +390,7 @@ class CurlDownloader
                 call_user_func($job['reject'], $e);
             }
         }
-
+        echo "Main loop exit\n";
         foreach ($this->jobs as $i => $curlHandle) {
             if (!isset($this->jobs[$i])) {
                 continue;
