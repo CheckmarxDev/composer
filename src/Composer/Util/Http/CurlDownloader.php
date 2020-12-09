@@ -352,7 +352,10 @@ class CurlDownloader
 
                 // fail 4xx and 5xx responses and capture the response
                 if ($statusCode >= 400 && $statusCode <= 599) {
-                    throw $this->failResponse($job, $response, $response->getStatusMessage());
+                    // JoaoD fix
+                    echo "Skipping\n";
+                    return;
+                    //throw $this->failResponse($job, $response, $response->getStatusMessage());
                 }
 
                 if ($job['attributes']['storeAuth']) {
