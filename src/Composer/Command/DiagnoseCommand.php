@@ -27,6 +27,8 @@ use Composer\Util\StreamContextFactory;
 use Composer\SelfUpdate\Keys;
 use Composer\SelfUpdate\Versions;
 use Composer\IO\NullIO;
+use Composer\Package\CompletePackageInterface;
+use Composer\XdebugHandler\XdebugHandler;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Process\ExecutableFinder;
@@ -159,7 +161,7 @@ EOT
         $platformRepo = new PlatformRepository(array(), $platformOverrides);
         $phpPkg = $platformRepo->findPackage('php', '*');
         $phpVersion = $phpPkg->getPrettyVersion();
-        if (false !== strpos($phpPkg->getDescription(), 'overridden')) {
+        if ($phpPkg instanceof CompletePackageInterface && false !== strpos($phpPkg->getDescription(), 'overridden')) {
             $phpVersion .= ' - ' . $phpPkg->getDescription();
         }
 
@@ -534,9 +536,10 @@ EOT
 
         if (filter_var(ini_get('xdebug.profiler_enabled'), FILTER_VALIDATE_BOOLEAN)) {
             $warnings['xdebug_profile'] = true;
-        } elseif (extension_loaded('xdebug')) {
-            $warnings['xdebug_loaded'] = true;
         }
+        // elseif (XdebugHandler::isXdebugActive()) {
+        //     $warnings['xdebug_loaded'] = true;
+        // }
 
         if (defined('PHP_WINDOWS_VERSION_BUILD')
             && (version_compare(PHP_VERSION, '7.2.23', '<')

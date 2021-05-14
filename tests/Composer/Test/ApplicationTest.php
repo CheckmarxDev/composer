@@ -13,6 +13,7 @@
 namespace Composer\Test;
 
 use Composer\Console\Application;
+use Composer\XdebugHandler\XdebugHandler;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class ApplicationTest extends TestCase
@@ -54,15 +55,15 @@ class ApplicationTest extends TestCase
         $outputMock->expects($this->at($index++))
             ->method("write");
 
-        if (extension_loaded('xdebug')) {
-            $outputMock->expects($this->at($index++))
-                ->method("getVerbosity")
-                ->willReturn(OutputInterface::VERBOSITY_NORMAL);
+        // if (XdebugHandler::isXdebugActive()) {
+        //     $outputMock->expects($this->at($index++))
+        //         ->method("getVerbosity")
+        //         ->willReturn(OutputInterface::VERBOSITY_NORMAL);
 
-            $outputMock->expects($this->at($index++))
-                ->method("write")
-                ->with($this->equalTo('<warning>Composer is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>'));
-        }
+        //     $outputMock->expects($this->at($index++))
+        //         ->method("write")
+        //         ->with($this->equalTo('<warning>Composer is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>'));
+        // }
 
         $outputMock->expects($this->at($index++))
             ->method("getVerbosity")

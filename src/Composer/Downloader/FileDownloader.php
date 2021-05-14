@@ -27,6 +27,7 @@ use Composer\Plugin\PostFileDownloadEvent;
 use Composer\Plugin\PreFileDownloadEvent;
 use Composer\EventDispatcher\EventDispatcher;
 use Composer\Util\Filesystem;
+use Composer\Util\Silencer;
 use Composer\Util\HttpDownloader;
 use Composer\Util\Url as UrlUtil;
 use Composer\Util\ProcessExecutor;
@@ -111,8 +112,10 @@ class FileDownloader implements DownloaderInterface, ChangeReportInterface
         };
 
         $retries = 3;
-        $urls = $package->getDistUrls();
-        foreach ($urls as $index => $url) {
+        $distUrls = $package->getDistUrls();
+        /** @var array<array{base: string, processed: string, cacheKey: string}> $urls */
+        $urls = array();
+        foreach ($distUrls as $index => $url) {
             $processedUrl = $this->processUrl($package, $url);
             $urls[$index] = array(
                 'base' => $url,
@@ -139,6 +142,7 @@ class FileDownloader implements DownloaderInterface, ChangeReportInterface
         $accept = null;
         $reject = null;
         $download = function () use ($io, $output, $httpDownloader, $cache, $cacheKeyGenerator, $eventDispatcher, $package, $fileName, &$urls, &$accept, &$reject) {
+            /** @var array{base: string, processed: string, cacheKey: string} $url */
             $url = reset($urls);
             $index = key($urls);
 
@@ -196,7 +200,7 @@ class FileDownloader implements DownloaderInterface, ChangeReportInterface
                 }
 
                 if ($eventDispatcher) {
-                    $postFileDownloadEvent = new PostFileDownloadEvent(PluginEvents::POST_FILE_DOWNLOAD, $fileName, $checksum, $url['processed'], $package);
+                    $postFileDownloadEvent = new PostFileDownloadEvent(PluginEvents::POST_FILE_DOWNLOAD, $fileName, $checksum, $url['processed'], 'package', $package);
                     $eventDispatcher->dispatch($postFileDownloadEvent->getName(), $postFileDownloadEvent);
                 }
 
@@ -226,6 +230,10 @@ class FileDownloader implements DownloaderInterface, ChangeReportInterface
             $self->clearLastCacheWrite($package);
 
             if ($e instanceof IrrecoverableDownloadException) {
+                throw $e;
+            }
+
+            if ($e instanceof MaxFileSizeExceededException) {
                 throw $e;
             }
 
@@ -275,6 +283,7 @@ class FileDownloader implements DownloaderInterface, ChangeReportInterface
      */
     public function prepare($type, PackageInterface $package, $path, PackageInterface $prevPackage = null)
     {
+        return \React\Promise\resolve();
     }
 
     /**
@@ -304,6 +313,8 @@ class FileDownloader implements DownloaderInterface, ChangeReportInterface
                 $this->filesystem->removeDirectory($dir);
             }
         }
+
+        return \React\Promise\resolve();
     }
 
     /**
@@ -318,6 +329,18 @@ class FileDownloader implements DownloaderInterface, ChangeReportInterface
         $this->filesystem->emptyDirectory($path);
         $this->filesystem->ensureDirectoryExists($path);
         $this->filesystem->rename($this->getFileName($package, $path), $path . '/' . pathinfo(parse_url($package->getDistUrl(), PHP_URL_PATH), PATHINFO_BASENAME));
+
+        if ($package->getBinaries()) {
+            // Single files can not have a mode set like files in archives
+            // so we make sure if the file is a binary that it is executable
+            foreach ($package->getBinaries() as $bin) {
+                if (file_exists($path . '/' . $bin) && !is_executable($path . '/' . $bin)) {
+                    Silencer::call('chmod', $path . '/' . $bin, 0777 & ~umask());
+                }
+            }
+        }
+
+        return \React\Promise\resolve();
     }
 
     /**

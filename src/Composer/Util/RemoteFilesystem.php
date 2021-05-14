@@ -254,7 +254,7 @@ class RemoteFilesystem
 
         $ctx = StreamContextFactory::getContext($fileUrl, $options, array('notification' => array($this, 'callbackGet')));
 
-        $proxy = ProxyManager::getInstance()->getProxyForRequest($fileUrl);
+        $proxy = $this->proxyManager->getProxyForRequest($fileUrl);
         $usingProxy = $proxy->getFormattedUrl(' using proxy (%s)');
         $this->io->writeError((strpos($origFileUrl, 'http') === 0 ? 'Downloading ' : 'Reading ') . Url::sanitize($origFileUrl) . $usingProxy, true, IOInterface::DEBUG);
         unset($origFileUrl, $proxy, $usingProxy);
@@ -302,7 +302,7 @@ class RemoteFilesystem
                 $e->setStatusCode(self::findStatusCode($http_response_header));
                 try {
                     $e->setResponse($this->decodeResult($result, $http_response_header));
-                } catch (\Exception $e) {
+                } catch (\Exception $discarded) {
                     $e->setResponse($result);
                 }
 
@@ -395,8 +395,9 @@ class RemoteFilesystem
         if ($statusCode && $statusCode >= 400 && $statusCode <= 599) {
             //JoaoD fix
             // return an empty json for the failed request
-            echo "Skipping-RemoteFileSystem\n";
+            echo "Skipping-RemoteFilesystem\n";
             return "{}";
+            
             // if (!$this->retry) {
             //     if ($this->progress && !$isRedirect) {
             //         $this->io->overwriteError("Downloading (<error>failed</error>)", false);
