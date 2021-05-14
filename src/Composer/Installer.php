@@ -135,13 +135,14 @@ class Installer
     protected $writeLock;
     protected $executeOperations = true;
 
+    /** @var bool */
+    protected $updateMirrors = false;
     /**
      * Array of package names/globs flagged for update
      *
      * @var array|null
      */
-    protected $updateMirrors = false;
-    protected $updateAllowList;
+    protected $updateAllowList = null;
     protected $updateAllowTransitiveDependencies = Request::UPDATE_ONLY_LISTED;
 
     /**
@@ -444,6 +445,15 @@ class Installer
                     $installsUpdates[] = $operation;
                     $installNames[] = $operation->getPackage()->getPrettyName().':'.$operation->getPackage()->getFullPrettyVersion();
                 } elseif ($operation instanceof UpdateOperation) {
+                    // when mirrors/metadata from a package gets updated we do not want to list it as an
+                    // update in the output as it is only an internal lock file metadata update
+                    if ($this->updateMirrors
+                        && $operation->getInitialPackage()->getName() == $operation->getTargetPackage()->getName()
+                        && $operation->getInitialPackage()->getVersion() == $operation->getTargetPackage()->getVersion()
+                    ) {
+                        continue;
+                    }
+
                     $installsUpdates[] = $operation;
                     $updateNames[] = $operation->getTargetPackage()->getPrettyName().':'.$operation->getTargetPackage()->getFullPrettyVersion();
                 } elseif ($operation instanceof UninstallOperation) {
@@ -918,7 +928,8 @@ class Installer
         foreach ($packages as $key => $package) {
             if ($package instanceof AliasPackage) {
                 $alias = (string) $package->getAliasOf();
-                $packages[$key] = new AliasPackage($packages[$alias], $package->getVersion(), $package->getPrettyVersion());
+                $className = get_class($package);
+                $packages[$key] = new $className($packages[$alias], $package->getVersion(), $package->getPrettyVersion());
             }
         }
         $rm->setLocalRepository(

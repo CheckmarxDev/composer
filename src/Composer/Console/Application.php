@@ -13,6 +13,7 @@
 namespace Composer\Console;
 
 use Composer\IO\NullIO;
+use Composer\Util\Filesystem;
 use Composer\Util\Platform;
 use Composer\Util\Silencer;
 use Symfony\Component\Console\Application as BaseApplication;
@@ -33,6 +34,8 @@ use Composer\Util\ErrorHandler;
 use Composer\Util\HttpDownloader;
 use Composer\EventDispatcher\ScriptExecutionException;
 use Composer\Exception\NoSslException;
+use Composer\XdebugHandler\XdebugHandler;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 
 /**
  * The console application that handles the commands
@@ -44,7 +47,7 @@ use Composer\Exception\NoSslException;
 class Application extends BaseApplication
 {
     /**
-     * @var Composer
+     * @var ?Composer
      */
     protected $composer;
 
@@ -280,7 +283,7 @@ class Application extends BaseApplication
 
             // add non-standard scripts as own commands
             $file = Factory::getComposerFile();
-            if (is_file($file) && is_readable($file) && is_array($composer = json_decode(file_get_contents($file), true))) {
+            if (is_file($file) && Filesystem::isReadable($file) && is_array($composer = json_decode(file_get_contents($file), true))) {
                 if (isset($composer['scripts']) && is_array($composer['scripts'])) {
                     foreach ($composer['scripts'] as $script => $dummy) {
                         if (!defined('Composer\Script\ScriptEvents::'.str_replace('-', '_', strtoupper($script)))) {
@@ -383,6 +386,11 @@ class Application extends BaseApplication
         if (false !== strpos($exception->getMessage(), 'fork failed - Cannot allocate memory')) {
             $io->writeError('<error>The following exception is caused by a lack of memory or swap, or not having swap configured</error>', true, IOInterface::QUIET);
             $io->writeError('<error>Check https://getcomposer.org/doc/articles/troubleshooting.md#proc-open-fork-failed-errors for details</error>', true, IOInterface::QUIET);
+        }
+
+        if ($exception instanceof ProcessTimedOutException) {
+            $io->writeError('<error>The following exception is caused by a process timeout</error>', true, IOInterface::QUIET);
+            $io->writeError('<error>Check https://getcomposer.org/doc/06-config.md#process-timeout for details</error>', true, IOInterface::QUIET);
         }
 
         if ($hints = HttpDownloader::getExceptionHints($exception)) {

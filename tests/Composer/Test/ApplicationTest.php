@@ -13,6 +13,7 @@
 namespace Composer\Test;
 
 use Composer\Console\Application;
+use Composer\XdebugHandler\XdebugHandler;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class ApplicationTest extends TestCase

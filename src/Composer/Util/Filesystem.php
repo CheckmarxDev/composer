@@ -12,7 +12,7 @@
 
 namespace Composer\Util;
 
-use React\Promise\Promise;
+use React\Promise\PromiseInterface;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use Symfony\Component\Filesystem\Exception\IOException;
@@ -128,7 +128,7 @@ class Filesystem
      *
      * @param  string            $directory
      * @throws \RuntimeException
-     * @return Promise
+     * @return PromiseInterface
      */
     public function removeDirectoryAsync($directory)
     {
@@ -574,7 +574,7 @@ class Filesystem
      * And other possible unforeseen disasters, see https://github.com/composer/composer/pull/9422
      *
      * @param  string $path
-     * @return bool
+     * @return string
      */
     public static function trimTrailingSlash($path)
     {
@@ -603,6 +603,33 @@ class Filesystem
         }
 
         return preg_replace('{^file://}i', '', $path);
+    }
+
+    /**
+     * Cross-platform safe version of is_readable()
+     *
+     * This will also check for readability by reading the file as is_readable can not be trusted on network-mounts
+     * and \\wsl$ paths. See https://github.com/composer/composer/issues/8231 and https://bugs.php.net/bug.php?id=68926
+     *
+     * @param string $path
+     * @return bool
+     */
+    public static function isReadable($path)
+    {
+        if (is_readable($path)) {
+            return true;
+        }
+
+        if (is_file($path)) {
+            return false !== Silencer::call('file_get_contents', $path, false, null, 0, 1);
+        }
+
+        if (is_dir($path)) {
+            return false !== Silencer::call('opendir', $path);
+        }
+
+        // assume false otherwise
+        return false;
     }
 
     protected function directorySize($directory)
