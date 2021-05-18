@@ -242,8 +242,12 @@ class Git
             if ($initialClone && isset($origCwd)) {
                 $this->filesystem->removeDirectory($origCwd);
             }
-
-            $this->throwException('Failed to execute ' . $command . "\n\n" . $errorMsg, $url);
+            
+            // David fix
+            // Skip when it fails running git command, instead of throwing error
+            echo "Skipping-Git\n";
+            
+            // $this->throwException('Failed to execute ' . $command . "\n\n" . $errorMsg, $url);
         }
     }
 

@@ -107,7 +107,11 @@ class ProcessExecutor
             $cwd = realpath(getcwd());
         }
         if (null !== $cwd && !is_dir($cwd)) {
-            throw new \RuntimeException('The given CWD for the process does not exist: '.$cwd);
+            // David fix
+            // Skip instead of throwing error
+            echo "Skipping-ProcessExecutor\n";
+            
+            // throw new \RuntimeException('The given CWD for the process does not exist: '.$cwd);
         }
 
         $this->captureOutput = func_num_args() > 3;
@@ -248,7 +252,11 @@ class ProcessExecutor
             $cwd = realpath(getcwd());
         }
         if (null !== $cwd && !is_dir($cwd)) {
-            throw new \RuntimeException('The given CWD for the process does not exist: '.$cwd);
+            // David fix
+            // Skip instead of throwing error
+            echo "Skipping-ProcessExecutor\n";
+
+            // throw new \RuntimeException('The given CWD for the process does not exist: '.$cwd);
         }
 
         // TODO in v3, commands should be passed in as arrays of cmd + args
