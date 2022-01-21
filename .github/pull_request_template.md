@@ -1,5 +1,13 @@
-<!-- Please remember to select the appropriate branch:
 
-For bug or doc fixes pick the oldest branch where the bugfix applies (2.0 typically, or 1.10 if it is a critical fix that should be fixed in Composer 1) 
+Please review your own code before asking someone else to review it - common courtesy.
 
-For new features and everything else, use the master branch. -->
+## Code Review Checklist
+
+- [ ] Are all code flows and logic covered by unit, integration and component tests? Test coverage is not optional.
+
+- [ ] Is the code aligned with our [best practices and conventions](https://checkmarx.atlassian.net/wiki/spaces/CXLUMO/pages/3149037741/Best+Practices+and+Conventions)?
+
+- [ ] Did you add relevant [logs and metrics](https://checkmarx.atlassian.net/wiki/spaces/CXLUMO/pages/3149037741/Best+Practices+and+Conventions#Logging-and-Metrics)?
+
+- [ ] Did you follow REST API guidelines?
+
