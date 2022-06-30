@@ -110,7 +110,6 @@ class ProcessExecutor
             // David fix
             // Skip instead of throwing error
             echo "Skipping-ProcessExecutor\n";
-            
             // throw new \RuntimeException('The given CWD for the process does not exist: '.$cwd);
         }
 
@@ -255,7 +254,6 @@ class ProcessExecutor
             // David fix
             // Skip instead of throwing error
             echo "Skipping-ProcessExecutor\n";
-
             // throw new \RuntimeException('The given CWD for the process does not exist: '.$cwd);
         }
 

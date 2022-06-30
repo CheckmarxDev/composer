@@ -393,7 +393,7 @@ class RemoteFilesystem
 
         // fail 4xx and 5xx responses and capture the response
         if ($statusCode && $statusCode >= 400 && $statusCode <= 599) {
-            //JoaoD fix
+            // JoaoD fix
             // return an empty json for the failed request
             echo "Skipping-RemoteFilesystem\n";
             return "{}";

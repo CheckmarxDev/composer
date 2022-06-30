@@ -246,7 +246,6 @@ class Git
             // David fix
             // Skip when it fails running git command, instead of throwing error
             echo "Skipping-Git\n";
-            
             // $this->throwException('Failed to execute ' . $command . "\n\n" . $errorMsg, $url);
         }
     }

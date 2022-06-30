@@ -190,9 +190,8 @@ class FileDownloader implements DownloaderInterface, ChangeReportInterface
                     // Skip when file not exists, instead of throwing error
                     echo "Skipping-FileDownloader\n";
                     return;
-                    
-                    throw new \UnexpectedValueException($url['base'].' could not be saved to '.$fileName.', make sure the'
-                        .' directory is writable and you have internet connectivity');
+                    // throw new \UnexpectedValueException($url['base'].' could not be saved to '.$fileName.', make sure the'
+                    //     .' directory is writable and you have internet connectivity');
                 }
 
                 if ($checksum && hash_file('sha1', $fileName) !== $checksum) {
