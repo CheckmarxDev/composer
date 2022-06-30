@@ -203,7 +203,6 @@ class JsonFile
 
         // David fix
         // Skip when property has errors, instead of throwing error
-        echo "Skipping-JsonFile\n";
 
         // $validator = new Validator();
         // $validator->check($data, $schemaData);

@@ -213,7 +213,6 @@ class Solver
         if ($this->problems) {
             // Alechko fix
             // Ignore problems and create a lock file anyway
-            echo "Skipping-Solver\n";
             // throw new SolverProblemsException($this->problems, $this->learnedPool);
         }
 

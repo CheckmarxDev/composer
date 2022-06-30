@@ -77,7 +77,6 @@ class RootPackageLoader extends ArrayLoader
         }
         // David fix
         // Skip when package name invalid, instead of throwing error
-        echo "Skipping-RootPackageLoader\n";
         // elseif ($err = ValidatingArrayLoader::hasPackageNamingError($config['name'])) {
         //     throw new \RuntimeException('Your package name '.$err);
         // }
@@ -160,7 +159,6 @@ class RootPackageLoader extends ArrayLoader
 
         // David fix
         // Skip when package name invalid, instead of throwing error
-        echo "Skipping-RootPackageLoader\n";
         // foreach (array_keys(BasePackage::$supportedLinkTypes) as $linkType) {
         //     if (isset($config[$linkType])) {
         //         foreach ($config[$linkType] as $linkName => $constraint) {

@@ -70,7 +70,6 @@ class ClassMapGenerator
             } else {
                 // David fix
                 // Skip when path is invalid, instead of throwing error, returning empty array
-                echo "Skipping-ClassMapGenerator\n";
                 return array();
                 // throw new \RuntimeException(
                 //     'Could not scan for classes inside "'.$path.
