@@ -213,7 +213,7 @@ class Solver
         if ($this->problems) {
             // Alechko fix
             // Ignore problems and create a lock file anyway
-            //throw new SolverProblemsException($this->problems, $this->learnedPool);
+            // throw new SolverProblemsException($this->problems, $this->learnedPool);
         }
 
         return new LockTransaction($this->pool, $request->getPresentMap(), $request->getFixedPackagesMap(), $this->decisions);

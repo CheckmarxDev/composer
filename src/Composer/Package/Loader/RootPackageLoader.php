@@ -74,9 +74,12 @@ class RootPackageLoader extends ArrayLoader
 
         if (!isset($config['name'])) {
             $config['name'] = '__root__';
-        } elseif ($err = ValidatingArrayLoader::hasPackageNamingError($config['name'])) {
-            throw new \RuntimeException('Your package name '.$err);
         }
+        // David fix
+        // Skip when package name invalid, instead of throwing error
+        // elseif ($err = ValidatingArrayLoader::hasPackageNamingError($config['name'])) {
+        //     throw new \RuntimeException('Your package name '.$err);
+        // }
         $autoVersioned = false;
         if (!isset($config['version'])) {
             $commit = null;
@@ -154,15 +157,17 @@ class RootPackageLoader extends ArrayLoader
             }
         }
 
-        foreach (array_keys(BasePackage::$supportedLinkTypes) as $linkType) {
-            if (isset($config[$linkType])) {
-                foreach ($config[$linkType] as $linkName => $constraint) {
-                    if ($err = ValidatingArrayLoader::hasPackageNamingError($linkName, true)) {
-                        throw new \RuntimeException($linkType.'.'.$err);
-                    }
-                }
-            }
-        }
+        // David fix
+        // Skip when package name invalid, instead of throwing error
+        // foreach (array_keys(BasePackage::$supportedLinkTypes) as $linkType) {
+        //     if (isset($config[$linkType])) {
+        //         foreach ($config[$linkType] as $linkName => $constraint) {
+        //             if ($err = ValidatingArrayLoader::hasPackageNamingError($linkName, true)) {
+        //                 throw new \RuntimeException($linkType.'.'.$err);
+        //             }
+        //         }
+        //     }
+        // }
 
         $realPackage->setAliases($aliases);
         $realPackage->setStabilityFlags($stabilityFlags);
