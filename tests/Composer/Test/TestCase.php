@@ -12,21 +12,39 @@
 
 namespace Composer\Test;
 
+use Composer\Pcre\Preg;
 use Composer\Semver\VersionParser;
 use Composer\Package\RootPackageInterface;
 use Composer\Package\PackageInterface;
 use Composer\Semver\Constraint\Constraint;
 use Composer\Util\Filesystem;
+use Composer\Util\Platform;
 use Composer\Util\Silencer;
 use Symfony\Component\Process\ExecutableFinder;
 use Composer\Package\Loader\ArrayLoader;
 use Composer\Package\BasePackage;
+use Composer\Package\RootPackage;
+use Composer\Package\AliasPackage;
+use Composer\Package\RootAliasPackage;
+use Composer\Package\CompletePackage;
+use Composer\Package\CompleteAliasPackage;
+use Composer\Package\CompletePackageInterface;
+use Composer\Package\Package;
 
 abstract class TestCase extends PolyfillTestCase
 {
+    /**
+     * @var ?VersionParser
+     */
     private static $parser;
+    /**
+     * @var array<string, bool>
+     */
     private static $executableCache = array();
 
+    /**
+     * @return string
+     */
     public static function getUniqueTmpDirectory()
     {
         $attempts = 5;
@@ -43,6 +61,9 @@ abstract class TestCase extends PolyfillTestCase
         throw new \RuntimeException('Failed to create a unique temporary directory.');
     }
 
+    /**
+     * @return VersionParser
+     */
     protected static function getVersionParser()
     {
         if (!self::$parser) {
@@ -52,6 +73,11 @@ abstract class TestCase extends PolyfillTestCase
         return self::$parser;
     }
 
+    /**
+     * @param Constraint::STR_OP_* $operator
+     * @param string $version
+     * @return Constraint
+     */
     protected function getVersionConstraint($operator, $version)
     {
         $constraint = new Constraint(
@@ -64,25 +90,46 @@ abstract class TestCase extends PolyfillTestCase
         return $constraint;
     }
 
-    protected function getPackage($name, $version, $class = 'Composer\Package\Package')
+    /**
+     * @template PackageClass of PackageInterface
+     *
+     * @param  string $class  FQCN to be instantiated
+     * @param  string $name
+     * @param  string $version
+     *
+     * @return CompletePackage|CompleteAliasPackage|RootPackage|RootAliasPackage
+     *
+     * @phpstan-param class-string<PackageClass> $class
+     */
+    protected function getPackage($name, $version, $class = 'Composer\Package\CompletePackage')
     {
         $normVersion = self::getVersionParser()->normalize($version);
 
         return new $class($name, $normVersion, $version);
     }
 
-    protected function getAliasPackage($package, $version)
+    /**
+     * @param string $version
+     * @return AliasPackage|RootAliasPackage|CompleteAliasPackage
+     */
+    protected function getAliasPackage(Package $package, $version)
     {
         $normVersion = self::getVersionParser()->normalize($version);
 
-        $class = 'Composer\Package\AliasPackage';
-        if ($package instanceof RootPackageInterface) {
-            $class = 'Composer\Package\RootAliasPackage';
+        if ($package instanceof RootPackage) {
+            return new RootAliasPackage($package, $normVersion, $version);
+        }
+        if ($package instanceof CompletePackage) {
+            return new CompleteAliasPackage($package, $normVersion, $version);
         }
 
-        return new $class($package, $normVersion, $version);
+        return new AliasPackage($package, $normVersion, $version);
     }
 
+    /**
+     * @param array<string, array<string, string>> $config
+     * @return void
+     */
     protected function configureLinks(PackageInterface $package, array $config)
     {
         $arrayLoader = new ArrayLoader();
@@ -94,7 +141,7 @@ abstract class TestCase extends PolyfillTestCase
                     $arrayLoader->parseLinks(
                         $package->getName(),
                         $package->getPrettyVersion(),
-                        $opts['description'],
+                        $opts['method'],
                         $config[$type]
                     )
                 );
@@ -102,6 +149,10 @@ abstract class TestCase extends PolyfillTestCase
         }
     }
 
+    /**
+     * @param  string $directory
+     * @return void
+     */
     protected static function ensureDirectoryExistsAndClear($directory)
     {
         $fs = new Filesystem();
@@ -117,6 +168,8 @@ abstract class TestCase extends PolyfillTestCase
      * Check whether or not the given name is an available executable.
      *
      * @param string $executableName The name of the binary to test.
+     *
+     * @return void
      *
      * @throws \PHPUnit\Framework\SkippedTestError
      */
@@ -136,6 +189,7 @@ abstract class TestCase extends PolyfillTestCase
      * @param string      $exception
      * @param string|null $message
      * @param int|null    $code
+     * @return void
      */
     public function setExpectedException($exception, $message = null, $code = null)
     {
@@ -150,5 +204,26 @@ abstract class TestCase extends PolyfillTestCase
         } else {
             parent::setExpectedException($exception, $message, $code);
         }
+    }
+
+    /**
+     * Transforms an escaped non-Windows command to match Windows escaping.
+     *
+     * @param string $cmd
+     *
+     * @return string The transformed command
+     */
+    protected function getCmd($cmd)
+    {
+        if (Platform::isWindows()) {
+            $cmd = Preg::replaceCallback("/('[^']*')/", function ($m) {
+                // Double-quotes are used only when needed
+                $char = (strpbrk($m[1], " \t^&|<>()") !== false || $m[1] === "''") ? '"' : '';
+
+                return str_replace("'", $char, $m[1]);
+            }, $cmd);
+        }
+
+        return $cmd;
     }
 }

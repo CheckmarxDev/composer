@@ -18,6 +18,7 @@ use Composer\Util\Filesystem;
 
 class RepositoryManagerTest extends TestCase
 {
+    /** @var string */
     protected $tmpdir;
 
     public function setUp()
@@ -51,7 +52,11 @@ class RepositoryManagerTest extends TestCase
     }
 
     /**
-     * @dataProvider creationCases
+     * @dataProvider provideRepoCreationTestCases
+     *
+     * @param string               $type
+     * @param array<string, mixed> $options
+     * @param string|null          $exception
      */
     public function testRepoCreation($type, $options, $exception = null)
     {
@@ -89,7 +94,7 @@ class RepositoryManagerTest extends TestCase
         $this->assertInstanceOf('Composer\Repository\RepositoryInterface', $rm->createRepository($type, $options));
     }
 
-    public function creationCases()
+    public function provideRepoCreationTestCases()
     {
         $cases = array(
             array('composer', array('url' => 'http://example.org')),
@@ -97,7 +102,7 @@ class RepositoryManagerTest extends TestCase
             array('git', array('url' => 'http://github.com/foo/bar')),
             array('git', array('url' => 'git@example.org:foo/bar.git')),
             array('svn', array('url' => 'svn://example.org/foo/bar')),
-            array('pear', array('url' => 'http://pear.example.org/foo'), 'RuntimeException'),
+            array('pear', array('url' => 'http://pear.example.org/foo'), 'InvalidArgumentException'),
             array('package', array('package' => array())),
             array('invalid', array(), 'InvalidArgumentException'),
         );

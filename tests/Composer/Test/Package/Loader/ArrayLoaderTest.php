@@ -14,6 +14,7 @@ namespace Composer\Test\Package\Loader;
 
 use Composer\Package\Loader\ArrayLoader;
 use Composer\Package\Dumper\ArrayDumper;
+use Composer\Package\Link;
 use Composer\Test\TestCase;
 
 class ArrayLoaderTest extends TestCase
@@ -133,6 +134,11 @@ class ArrayLoaderTest extends TestCase
         return array(array($validConfig));
     }
 
+    /**
+     * @param array<string, mixed> $config
+     *
+     * @return array<string, mixed>
+     */
     protected function fixConfigWhenLoadConfigIsFalse($config)
     {
         $expectedConfig = $config;
@@ -146,6 +152,8 @@ class ArrayLoaderTest extends TestCase
      * allows require-dev libraries to have transport options included.
      *
      * @dataProvider parseDumpProvider
+     *
+     * @param array<string, mixed> $config
      */
     public function testParseDumpDefaultLoadConfig($config)
     {
@@ -157,6 +165,8 @@ class ArrayLoaderTest extends TestCase
 
     /**
      * @dataProvider parseDumpProvider
+     *
+     * @param array<string, mixed> $config
      */
     public function testParseDumpTrueLoadConfig($config)
     {
@@ -169,6 +179,8 @@ class ArrayLoaderTest extends TestCase
 
     /**
      * @dataProvider parseDumpProvider
+     *
+     * @param array<string, mixed> $config
      */
     public function testParseDumpFalseLoadConfig($config)
     {
@@ -261,7 +273,7 @@ class ArrayLoaderTest extends TestCase
         $this->assertFalse($package->isAbandoned());
     }
 
-    public function pluginApiVersions()
+    public function providePluginApiVersions()
     {
         return array(
             array('1.0'),
@@ -283,11 +295,13 @@ class ArrayLoaderTest extends TestCase
     }
 
     /**
-     * @dataProvider pluginApiVersions
+     * @dataProvider providePluginApiVersions
+     *
+     * @param string $apiVersion
      */
     public function testPluginApiVersionAreKeptAsDeclared($apiVersion)
     {
-        $links = $this->loader->parseLinks('Plugin', '9.9.9', '', array('composer-plugin-api' => $apiVersion));
+        $links = $this->loader->parseLinks('Plugin', '9.9.9', Link::TYPE_REQUIRE, array('composer-plugin-api' => $apiVersion));
 
         $this->assertArrayHasKey('composer-plugin-api', $links);
         $this->assertSame($apiVersion, $links['composer-plugin-api']->getConstraint()->getPrettyString());
@@ -295,9 +309,20 @@ class ArrayLoaderTest extends TestCase
 
     public function testPluginApiVersionDoesSupportSelfVersion()
     {
-        $links = $this->loader->parseLinks('Plugin', '6.6.6', '', array('composer-plugin-api' => 'self.version'));
+        $links = $this->loader->parseLinks('Plugin', '6.6.6', Link::TYPE_REQUIRE, array('composer-plugin-api' => 'self.version'));
 
         $this->assertArrayHasKey('composer-plugin-api', $links);
         $this->assertSame('6.6.6', $links['composer-plugin-api']->getConstraint()->getPrettyString());
+    }
+
+    public function testNoneStringVersion()
+    {
+        $config = array(
+            'name' => 'acme/package',
+            'version' => 1,
+        );
+
+        $package = $this->loader->load($config);
+        $this->assertSame('1', $package->getPrettyVersion());
     }
 }

@@ -20,6 +20,7 @@ use Composer\DependencyResolver\LockTransaction;
 use Composer\DependencyResolver\Operation\UpdateOperation;
 use Composer\DependencyResolver\Operation\InstallOperation;
 use Composer\DependencyResolver\Operation\UninstallOperation;
+use Composer\DependencyResolver\PoolOptimizer;
 use Composer\DependencyResolver\Pool;
 use Composer\DependencyResolver\Request;
 use Composer\DependencyResolver\Solver;
@@ -27,6 +28,9 @@ use Composer\DependencyResolver\SolverProblemsException;
 use Composer\DependencyResolver\PolicyInterface;
 use Composer\Downloader\DownloadManager;
 use Composer\EventDispatcher\EventDispatcher;
+use Composer\Filter\PlatformRequirementFilter\IgnoreListPlatformRequirementFilter;
+use Composer\Filter\PlatformRequirementFilter\PlatformRequirementFilterFactory;
+use Composer\Filter\PlatformRequirementFilter\PlatformRequirementFilterInterface;
 use Composer\Installer\InstallationManager;
 use Composer\Installer\InstallerEvents;
 use Composer\Installer\SuggestedPackagesReporter;
@@ -56,6 +60,7 @@ use Composer\Repository\RepositoryInterface;
 use Composer\Repository\RepositoryManager;
 use Composer\Repository\LockArrayRepository;
 use Composer\Script\ScriptEvents;
+use Composer\Util\Platform;
 
 /**
  * @author Jordi Boggiano <j.boggiano@seld.be>
@@ -65,6 +70,13 @@ use Composer\Script\ScriptEvents;
  */
 class Installer
 {
+    const ERROR_NONE = 0; // no error/success state
+    const ERROR_GENERIC_FAILURE = 1;
+    const ERROR_NO_LOCK_FILE_FOR_PARTIAL_UPDATE = 3;
+    const ERROR_LOCK_FILE_INVALID = 4;
+    // used/declared in SolverProblemsException, carried over here for completeness
+    const ERROR_DEPENDENCY_RESOLUTION_FAILED = 2;
+
     /**
      * @var IOInterface
      */
@@ -76,13 +88,13 @@ class Installer
     protected $config;
 
     /**
-     * @var RootPackageInterface
+     * @var RootPackageInterface&BasePackage
      */
     protected $package;
 
     // TODO can we get rid of the below and just use the package itself?
     /**
-     * @var RootPackageInterface
+     * @var RootPackageInterface&BasePackage
      */
     protected $fixedRootPackage;
 
@@ -116,23 +128,39 @@ class Installer
      */
     protected $autoloadGenerator;
 
+    /** @var bool */
     protected $preferSource = false;
+    /** @var bool */
     protected $preferDist = false;
+    /** @var bool */
     protected $optimizeAutoloader = false;
+    /** @var bool */
     protected $classMapAuthoritative = false;
+    /** @var bool */
     protected $apcuAutoloader = false;
-    protected $apcuAutoloaderPrefix;
+    /** @var string|null */
+    protected $apcuAutoloaderPrefix = null;
+    /** @var bool */
     protected $devMode = false;
+    /** @var bool */
     protected $dryRun = false;
+    /** @var bool */
     protected $verbose = false;
+    /** @var bool */
     protected $update = false;
+    /** @var bool */
     protected $install = true;
+    /** @var bool */
     protected $dumpAutoloader = true;
+    /** @var bool */
     protected $runScripts = true;
-    protected $ignorePlatformReqs = false;
+    /** @var bool */
     protected $preferStable = false;
+    /** @var bool */
     protected $preferLowest = false;
+    /** @var bool */
     protected $writeLock;
+    /** @var bool */
     protected $executeOperations = true;
 
     /** @var bool */
@@ -140,9 +168,10 @@ class Installer
     /**
      * Array of package names/globs flagged for update
      *
-     * @var array|null
+     * @var string[]|null
      */
     protected $updateAllowList = null;
+    /** @var Request::UPDATE_* */
     protected $updateAllowTransitiveDependencies = Request::UPDATE_ONLY_LISTED;
 
     /**
@@ -151,7 +180,12 @@ class Installer
     protected $suggestedPackagesReporter;
 
     /**
-     * @var RepositoryInterface
+     * @var PlatformRequirementFilterInterface
+     */
+    protected $platformRequirementFilter;
+
+    /**
+     * @var ?RepositoryInterface
      */
     protected $additionalFixedRepository;
 
@@ -160,7 +194,7 @@ class Installer
      *
      * @param IOInterface          $io
      * @param Config               $config
-     * @param RootPackageInterface $package
+     * @param RootPackageInterface&BasePackage $package
      * @param DownloadManager      $downloadManager
      * @param RepositoryManager    $repositoryManager
      * @param Locker               $locker
@@ -179,6 +213,8 @@ class Installer
         $this->installationManager = $installationManager;
         $this->eventDispatcher = $eventDispatcher;
         $this->autoloadGenerator = $autoloadGenerator;
+        $this->suggestedPackagesReporter = new SuggestedPackagesReporter($this->io);
+        $this->platformRequirementFilter = PlatformRequirementFilterFactory::ignoreNothing();
 
         $this->writeLock = $config->get('lock');
     }
@@ -188,6 +224,7 @@ class Installer
      *
      * @throws \Exception
      * @return int        0 on success or a positive error code on failure
+     * @phpstan-return self::ERROR_*
      */
     public function run()
     {
@@ -206,7 +243,7 @@ class Installer
 
         // Force update if there is no lock file present
         if (!$this->update && !$this->locker->isLocked()) {
-            $this->io->writeError('<warning>No lock file found. Updating dependencies instead of installing from lock file. Use composer update over composer install if you do not have a lock file.</warning>');
+            $this->io->writeError('<warning>No composer.lock file present. Updating dependencies to latest instead of installing from lock file. See https://getcomposer.org/install for more information.</warning>');
             $this->update = true;
         }
 
@@ -224,8 +261,7 @@ class Installer
         }
 
         if ($this->runScripts) {
-            $_SERVER['COMPOSER_DEV_MODE'] = $this->devMode ? '1' : '0';
-            putenv('COMPOSER_DEV_MODE='.$_SERVER['COMPOSER_DEV_MODE']);
+            Platform::putEnv('COMPOSER_DEV_MODE', $this->devMode ? '1' : '0');
 
             // dispatch pre event
             // should we treat this more strictly as running an update and then running an install, triggering events multiple times?
@@ -237,10 +273,6 @@ class Installer
         $this->downloadManager->setPreferDist($this->preferDist);
 
         $localRepo = $this->repositoryManager->getLocalRepository();
-
-        if (!$this->suggestedPackagesReporter) {
-            $this->suggestedPackagesReporter = new SuggestedPackagesReporter($this->io);
-        }
 
         try {
             if ($this->update) {
@@ -305,7 +337,7 @@ class Installer
             $this->autoloadGenerator->setClassMapAuthoritative($this->classMapAuthoritative);
             $this->autoloadGenerator->setApcu($this->apcuAutoloader, $this->apcuAutoloaderPrefix);
             $this->autoloadGenerator->setRunScripts($this->runScripts);
-            $this->autoloadGenerator->setIgnorePlatformRequirements($this->ignorePlatformReqs);
+            $this->autoloadGenerator->setPlatformRequirementFilter($this->platformRequirementFilter);
             $this->autoloadGenerator->dump($this->config, $localRepo, $this->package, $this->installationManager, 'composer', $this->optimizeAutoloader);
         }
 
@@ -322,7 +354,7 @@ class Installer
                 $fundingCount++;
             }
         }
-        if ($fundingCount) {
+        if ($fundingCount > 0) {
             $this->io->writeError(array(
                 sprintf(
                     "<info>%d package%s you are using %s looking for funding.</info>",
@@ -348,6 +380,12 @@ class Installer
         return 0;
     }
 
+    /**
+     * @param bool $doInstall
+     *
+     * @return int
+     * @phpstan-return self::ERROR_*
+     */
     protected function doUpdate(InstalledRepositoryInterface $localRepo, $doInstall)
     {
         $platformRepo = $this->createPlatformRepo(true);
@@ -371,7 +409,7 @@ class Installer
         if (($this->updateAllowList || $this->updateMirrors) && !$lockedRepository) {
             $this->io->writeError('<error>Cannot update ' . ($this->updateMirrors ? 'lock file information' : 'only a partial set of packages') . ' without a lock file present. Run `composer update` to generate a lock file.</error>', true, IOInterface::QUIET);
 
-            return 1;
+            return self::ERROR_NO_LOCK_FILE_FOR_PARTIAL_UPDATE;
         }
 
         $this->io->writeError('<info>Loading composer repositories with package information</info>');
@@ -395,14 +433,14 @@ class Installer
             $request->setUpdateAllowList($this->updateAllowList, $this->updateAllowTransitiveDependencies);
         }
 
-        $pool = $repositorySet->createPool($request, $this->io, $this->eventDispatcher);
+        $pool = $repositorySet->createPool($request, $this->io, $this->eventDispatcher, $this->createPoolOptimizer($policy));
 
         $this->io->writeError('<info>Updating dependencies</info>');
 
         // solve dependencies
         $solver = new Solver($policy, $pool, $this->io);
         try {
-            $lockTransaction = $solver->solve($request, $this->ignorePlatformReqs);
+            $lockTransaction = $solver->solve($request, $this->platformRequirementFilter);
             $ruleSetSize = $solver->getRuleSetSize();
             $solver = null;
         } catch (SolverProblemsException $e) {
@@ -418,11 +456,13 @@ class Installer
             $ghe = new GithubActionError($this->io);
             $ghe->emit($err."\n".$prettyProblem);
 
-            return max(1, $e->getCode());
+            return max(self::ERROR_GENERIC_FAILURE, $e->getCode());
         }
 
         $this->io->writeError("Analyzed ".count($pool)." packages to resolve dependencies", true, IOInterface::VERBOSE);
         $this->io->writeError("Analyzed ".$ruleSetSize." rules to resolve dependencies", true, IOInterface::VERBOSE);
+
+        $pool = null;
 
         if (!$lockTransaction->getOperations()) {
             $this->io->writeError('Nothing to modify in lock file');
@@ -431,6 +471,11 @@ class Installer
         $exitCode = $this->extractDevPackages($lockTransaction, $platformRepo, $aliases, $policy, $lockedRepository);
         if ($exitCode !== 0) {
             return $exitCode;
+        }
+
+        // exists as of composer/semver 3.3.0
+        if (method_exists('Composer\Semver\CompilingMatcher', 'clear')) { // @phpstan-ignore-line
+            \Composer\Semver\CompilingMatcher::clear();
         }
 
         // write lock
@@ -549,6 +594,13 @@ class Installer
     /**
      * Run the solver a second time on top of the existing update result with only the current result set in the pool
      * and see what packages would get removed if we only had the non-dev packages in the solver request
+     *
+     * @param array<int, array<string, string>> $aliases
+     *
+     * @return int
+     *
+     * @phpstan-param list<array{package: string, version: string, alias: string, alias_normalized: string}> $aliases
+     * @phpstan-return self::ERROR_*
      */
     protected function extractDevPackages(LockTransaction $lockTransaction, PlatformRepository $platformRepo, array $aliases, PolicyInterface $policy, LockArrayRepository $lockedRepository = null)
     {
@@ -573,7 +625,7 @@ class Installer
 
         $solver = new Solver($policy, $pool, $this->io);
         try {
-            $nonDevLockTransaction = $solver->solve($request, $this->ignorePlatformReqs);
+            $nonDevLockTransaction = $solver->solve($request, $this->platformRequirementFilter);
             $solver = null;
         } catch (SolverProblemsException $e) {
             $err = 'Unable to find a compatible set of packages based on your non-dev requirements alone.';
@@ -587,7 +639,7 @@ class Installer
             $ghe = new GithubActionError($this->io);
             $ghe->emit($err."\n".$prettyProblem);
 
-            return max(1, $e->getCode());
+            return $e->getCode();
         }
 
         $lockTransaction->setNonDevPackages($nonDevLockTransaction);
@@ -599,6 +651,7 @@ class Installer
      * @param  InstalledRepositoryInterface $localRepo
      * @param  bool                         $alreadySolved Whether the function is called as part of an update command or independently
      * @return int                          exit code
+     * @phpstan-return self::ERROR_*
      */
     protected function doInstall(InstalledRepositoryInterface $localRepo, $alreadySolved = false)
     {
@@ -638,14 +691,14 @@ class Installer
             // solve dependencies
             $solver = new Solver($policy, $pool, $this->io);
             try {
-                $lockTransaction = $solver->solve($request, $this->ignorePlatformReqs);
+                $lockTransaction = $solver->solve($request, $this->platformRequirementFilter);
                 $solver = null;
 
                 // installing the locked packages on this platform resulted in lock modifying operations, there wasn't a conflict, but the lock file as-is seems to not work on this system
                 if (0 !== count($lockTransaction->getOperations())) {
                     $this->io->writeError('<error>Your lock file cannot be installed on this system without changes. Please run composer update.</error>', true, IOInterface::QUIET);
 
-                    return 1;
+                    return self::ERROR_LOCK_FILE_INVALID;
                 }
             } catch (SolverProblemsException $e) {
                 $err = 'Your lock file does not contain a compatible set of packages. Please run composer update.';
@@ -657,7 +710,7 @@ class Installer
                 $ghe = new GithubActionError($this->io);
                 $ghe->emit($err."\n".$prettyProblem);
 
-                return max(1, $e->getCode());
+                return max(self::ERROR_GENERIC_FAILURE, $e->getCode());
             }
         }
 
@@ -716,6 +769,11 @@ class Installer
         return 0;
     }
 
+    /**
+     * @param bool $forUpdate
+     *
+     * @return PlatformRepository
+     */
     protected function createPlatformRepo($forUpdate)
     {
         if ($forUpdate) {
@@ -728,11 +786,13 @@ class Installer
     }
 
     /**
-     * @param  bool                     $forUpdate
-     * @param  PlatformRepository       $platformRepo
-     * @param  array                    $rootAliases
-     * @param  RepositoryInterface|null $lockedRepository
+     * @param  bool                              $forUpdate
+     * @param  array<int, array<string, string>> $rootAliases
+     * @param  RepositoryInterface|null          $lockedRepository
+     *
      * @return RepositorySet
+     *
+     * @phpstan-param list<array{package: string, version: string, alias: string, alias_normalized: string}> $rootAliases
      */
     private function createRepositorySet($forUpdate, PlatformRepository $platformRepo, array $rootAliases = array(), $lockedRepository = null)
     {
@@ -755,15 +815,16 @@ class Installer
 
         $rootRequires = array();
         foreach ($requires as $req => $constraint) {
-            // skip platform requirements from the root package to avoid filtering out existing platform packages
-            if ((true === $this->ignorePlatformReqs || (is_array($this->ignorePlatformReqs) && in_array($req, $this->ignorePlatformReqs, true))) && PlatformRepository::isPlatformPackage($req)) {
-                continue;
-            }
             if ($constraint instanceof Link) {
-                $rootRequires[$req] = $constraint->getConstraint();
-            } else {
-                $rootRequires[$req] = $constraint;
+                $constraint = $constraint->getConstraint();
             }
+            // skip platform requirements from the root package to avoid filtering out existing platform packages
+            if ($this->platformRequirementFilter->isIgnored($req)) {
+                continue;
+            } elseif ($this->platformRequirementFilter instanceof IgnoreListPlatformRequirementFilter) {
+                $constraint = $this->platformRequirementFilter->filterConstraint($req, $constraint);
+            }
+            $rootRequires[$req] = $constraint;
         }
 
         $this->fixedRootPackage = clone $this->package;
@@ -798,6 +859,8 @@ class Installer
     }
 
     /**
+     * @param bool $forUpdate
+     *
      * @return DefaultPolicy
      */
     private function createPolicy($forUpdate)
@@ -821,6 +884,7 @@ class Installer
     }
 
     /**
+     * @param RootPackageInterface&BasePackage $rootPackage
      * @return Request
      */
     private function createRequest(RootPackageInterface $rootPackage, PlatformRepository $platformRepo, LockArrayRepository $lockedRepository = null)
@@ -854,6 +918,12 @@ class Installer
         return $request;
     }
 
+    /**
+     * @param LockArrayRepository|null $lockedRepository
+     * @param bool                     $includeDevRequires
+     *
+     * @return void
+     */
     private function requirePackagesForUpdate(Request $request, LockArrayRepository $lockedRepository = null, $includeDevRequires = true)
     {
         // if we're updating mirrors we want to keep exactly the same versions installed which are in the lock file, but we want current remote metadata
@@ -882,8 +952,11 @@ class Installer
     }
 
     /**
-     * @param  bool  $forUpdate
-     * @return array
+     * @param bool $forUpdate
+     *
+     * @return array<int, array<string, string>>
+     *
+     * @phpstan-return list<array{package: string, version: string, alias: string, alias_normalized: string}>
      */
     private function getRootAliases($forUpdate)
     {
@@ -897,8 +970,9 @@ class Installer
     }
 
     /**
-     * @param  array $links
-     * @return array
+     * @param Link[] $links
+     *
+     * @return array<string, string>
      */
     private function extractPlatformRequirements(array $links)
     {
@@ -917,7 +991,7 @@ class Installer
      *
      * This is to prevent any accidental modification of the existing repos on disk
      *
-     * @param RepositoryManager $rm
+     * @return void
      */
     private function mockLocalRepositories(RepositoryManager $rm)
     {
@@ -935,6 +1009,23 @@ class Installer
         $rm->setLocalRepository(
             new InstalledArrayRepository($packages)
         );
+    }
+
+    /**
+     * @return PoolOptimizer|null
+     */
+    private function createPoolOptimizer(PolicyInterface $policy)
+    {
+        // Not the best architectural decision here, would need to be able
+        // to configure from the outside of Installer but this is only
+        // a debugging tool and should never be required in any other use case
+        if ('0' === Platform::getEnv('COMPOSER_POOL_OPTIMIZER')) {
+            $this->io->write('Pool Optimizer was disabled for debugging purposes.', true, IOInterface::DEBUG);
+
+            return null;
+        }
+
+        return new PoolOptimizer($policy);
     }
 
     /**
@@ -1131,6 +1222,7 @@ class Installer
      *
      * @param  bool      $runScripts
      * @return Installer
+     * @deprecated Use setRunScripts(false) on the EventDispatcher instance being injected instead
      */
     public function setRunScripts($runScripts = true)
     {
@@ -1182,18 +1274,26 @@ class Installer
      * If this is set to false, no platform requirements are ignored
      * If this is set to string[], those packages will be ignored
      *
-     * @param  bool|array $ignorePlatformReqs
+     * @param  bool|string[] $ignorePlatformReqs
+     *
      * @return Installer
+     *
+     * @deprecated use setPlatformRequirementFilter instead
      */
     public function setIgnorePlatformRequirements($ignorePlatformReqs)
     {
-        if (is_array($ignorePlatformReqs)) {
-            $this->ignorePlatformReqs = array_filter($ignorePlatformReqs, function ($req) {
-                return PlatformRepository::isPlatformPackage($req);
-            });
-        } else {
-            $this->ignorePlatformReqs = (bool) $ignorePlatformReqs;
-        }
+        trigger_error('Installer::setIgnorePlatformRequirements is deprecated since Composer 2.2, use setPlatformRequirementFilter instead.', E_USER_DEPRECATED);
+
+        return $this->setPlatformRequirementFilter(PlatformRequirementFilterFactory::fromBoolOrList($ignorePlatformReqs));
+    }
+
+    /**
+     * @param PlatformRequirementFilterInterface $platformRequirementFilter
+     * @return Installer
+     */
+    public function setPlatformRequirementFilter(PlatformRequirementFilterInterface $platformRequirementFilter)
+    {
+        $this->platformRequirementFilter = $platformRequirementFilter;
 
         return $this;
     }
@@ -1215,7 +1315,8 @@ class Installer
      * restrict the update operation to a few packages, all other packages
      * that are already installed will be kept at their current version
      *
-     * @param  array     $packages
+     * @param string[] $packages
+     *
      * @return Installer
      */
     public function setUpdateAllowList(array $packages)

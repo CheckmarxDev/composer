@@ -13,6 +13,7 @@
 namespace Composer\Test\IO;
 
 use Composer\IO\ConsoleIO;
+use Composer\Pcre\Preg;
 use Composer\Test\TestCase;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -83,8 +84,8 @@ class ConsoleIOTest extends TestCase
             ->method('write')
             ->with(
                 $this->callback(function ($messages) {
-                    $result = preg_match("[(.*)/(.*) First line]", $messages[0]) > 0;
-                    $result = $result && preg_match("[(.*)/(.*) Second line]", $messages[1]) > 0;
+                    $result = Preg::isMatch("[(.*)/(.*) First line]", $messages[0]);
+                    $result = $result && Preg::isMatch("[(.*)/(.*) Second line]", $messages[1]);
 
                     return $result;
                 }),
@@ -191,7 +192,7 @@ class ConsoleIOTest extends TestCase
         ;
 
         $consoleIO = new ConsoleIO($inputMock, $outputMock, $setMock);
-        $consoleIO->askConfirmation('Why?', 'default');
+        $consoleIO->askConfirmation('Why?', false);
     }
 
     public function testAskAndValidate()
@@ -250,7 +251,7 @@ class ConsoleIOTest extends TestCase
         ;
 
         $consoleIO = new ConsoleIO($inputMock, $outputMock, $setMock);
-        $result = $consoleIO->select('Select item', array("item1", "item2"), null, false, "Error message", true);
+        $result = $consoleIO->select('Select item', array("item1", "item2"), 'item1', false, "Error message", true);
         $this->assertEquals(array('1'), $result);
     }
 

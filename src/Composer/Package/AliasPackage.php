@@ -20,11 +20,20 @@ use Composer\Package\Version\VersionParser;
  */
 class AliasPackage extends BasePackage
 {
+    /** @var string */
     protected $version;
+    /** @var string */
     protected $prettyVersion;
+    /** @var bool */
     protected $dev;
+    /** @var bool */
     protected $rootPackageAlias = false;
+    /**
+     * @var string
+     * @phpstan-var 'stable'|'RC'|'beta'|'alpha'|'dev'
+     */
     protected $stability;
+    /** @var bool */
     protected $hasSelfVersionRequires = false;
 
     /** @var BasePackage */
@@ -43,9 +52,9 @@ class AliasPackage extends BasePackage
     /**
      * All descendants' constructors should call this parent constructor
      *
-     * @param BasePackage      $aliasOf       The package this package is an alias of
-     * @param string           $version       The version the alias must report
-     * @param string           $prettyVersion The alias's non-normalized version
+     * @param BasePackage $aliasOf       The package this package is an alias of
+     * @param string      $version       The version the alias must report
+     * @param string      $prettyVersion The alias's non-normalized version
      */
     public function __construct(BasePackage $aliasOf, $version, $prettyVersion)
     {
@@ -72,7 +81,7 @@ class AliasPackage extends BasePackage
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function getVersion()
     {
@@ -80,7 +89,7 @@ class AliasPackage extends BasePackage
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function getStability()
     {
@@ -88,7 +97,7 @@ class AliasPackage extends BasePackage
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function getPrettyVersion()
     {
@@ -96,7 +105,7 @@ class AliasPackage extends BasePackage
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function isDev()
     {
@@ -104,7 +113,7 @@ class AliasPackage extends BasePackage
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function getRequires()
     {
@@ -112,7 +121,8 @@ class AliasPackage extends BasePackage
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
+     * @return array<string|int, Link>
      */
     public function getConflicts()
     {
@@ -120,7 +130,8 @@ class AliasPackage extends BasePackage
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
+     * @return array<string|int, Link>
      */
     public function getProvides()
     {
@@ -128,7 +139,8 @@ class AliasPackage extends BasePackage
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
+     * @return array<string|int, Link>
      */
     public function getReplaces()
     {
@@ -136,7 +148,7 @@ class AliasPackage extends BasePackage
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function getDevRequires()
     {
@@ -167,8 +179,8 @@ class AliasPackage extends BasePackage
     }
 
     /**
-     * @param Link[] $links
-     * @param string $linkType
+     * @param Link[]       $links
+     * @param Link::TYPE_* $linkType
      *
      * @return Link[]
      */
@@ -205,6 +217,9 @@ class AliasPackage extends BasePackage
         return $links;
     }
 
+    /**
+     * @return bool
+     */
     public function hasSelfVersionRequires()
     {
         return $this->hasSelfVersionRequires;

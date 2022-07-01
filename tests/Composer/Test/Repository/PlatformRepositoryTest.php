@@ -12,7 +12,9 @@
 
 namespace Composer\Test\Repository;
 
-use Composer\Package\Package;
+use Composer\Composer;
+use Composer\Package\Link;
+use Composer\Package\PackageInterface;
 use Composer\Repository\PlatformRepository;
 use Composer\Test\TestCase;
 use PHPUnit\Framework\Assert;
@@ -34,7 +36,7 @@ class PlatformRepositoryTest extends TestCase
         self::assertSame('2.1.0', $hhvm->getPrettyVersion());
     }
 
-    public function getPhpFlavorTestCases()
+    public function providePhpFlavorTestCases()
     {
         return array(
             array(
@@ -111,7 +113,13 @@ class PlatformRepositoryTest extends TestCase
         );
     }
 
-    /** @dataProvider getPhpFlavorTestCases */
+    /**
+     * @dataProvider providePhpFlavorTestCases
+     *
+     * @param array<string, mixed>  $constants
+     * @param array<string, string> $packages
+     * @param array<string, mixed>  $functions
+     */
     public function testPhpVersion(array $constants, array $packages, array $functions = array())
     {
         $runtime = $this->getMockBuilder('Composer\Platform\Runtime')->getMock();
@@ -177,7 +185,7 @@ class PlatformRepositoryTest extends TestCase
         self::assertNull($package);
     }
 
-    public static function getLibraryTestCases()
+    public static function provideLibraryTestCases()
     {
         return array(
             'amqp' => array(
@@ -775,6 +783,13 @@ msgpack support => yes',
                 array(),
                 array(array('OPENSSL_VERSION_TEXT', null, 'OpenSSL 1.1.1g  21 Apr 2020')),
             ),
+            'openssl: distro peculiarities' => array(
+                'openssl',
+                null,
+                array('lib-openssl' => '1.1.1.7'),
+                array(),
+                array(array('OPENSSL_VERSION_TEXT', null, 'OpenSSL 1.1.1g-freebsd  21 Apr 2020')),
+            ),
             'openssl: two letters suffix' => array(
                 'openssl',
                 null,
@@ -1066,7 +1081,7 @@ Linked Version => 1.2.11',
     }
 
     /**
-     * @dataProvider getLibraryTestCases
+     * @dataProvider provideLibraryTestCases
      *
      * @param string|string[]            $extensions
      * @param string|null                $info
@@ -1182,7 +1197,14 @@ Linked Version => 1.2.11',
         }
     }
 
-    private function assertPackageLinks($context, array $expectedLinks, Package $sourcePackage, array $links)
+    /**
+     * @param string           $context
+     * @param string[]         $expectedLinks
+     * @param Link[]           $links
+     *
+     * @return void
+     */
+    private function assertPackageLinks($context, array $expectedLinks, PackageInterface $sourcePackage, array $links)
     {
         self::assertCount(count($expectedLinks), $links, sprintf('%s: expected package count to match', $context));
 
@@ -1192,12 +1214,77 @@ Linked Version => 1.2.11',
             self::assertTrue($link->getConstraint()->matches($this->getVersionConstraint('=', $sourcePackage->getVersion())));
         }
     }
+
+    public function testComposerPlatformVersion()
+    {
+        $runtime = $this->getMockBuilder('Composer\Platform\Runtime')->getMock();
+        $runtime
+            ->method('getExtensions')
+            ->willReturn(array());
+        $runtime
+            ->method('getConstant')
+            ->willReturnMap(
+                array(
+                    array('PHP_VERSION', null, '7.0.0'),
+                    array('PHP_DEBUG', null, false),
+                )
+            );
+
+        $platformRepository = new PlatformRepository(array(), array(), $runtime);
+
+        $package = $platformRepository->findPackage('composer', '='.Composer::getVersion());
+        self::assertNotNull($package, 'Composer package exists');
+    }
+
+    public static function providePlatformPackages()
+    {
+        return array(
+            array('php', true),
+            array('php-debug', true),
+            array('php-ipv6', true),
+            array('php-64bit', true),
+            array('php-zts', true),
+            array('hhvm', true),
+            array('hhvm-foo', false),
+            array('ext-foo', true),
+            array('ext-123', true),
+            array('extfoo', false),
+            array('ext', false),
+            array('lib-foo', true),
+            array('lib-123', true),
+            array('libfoo', false),
+            array('lib', false),
+            array('composer', true),
+            array('composer-foo', false),
+            array('composer-plugin-api', true),
+            array('composer-plugin', false),
+            array('composer-runtime-api', true),
+            array('composer-runtime', false),
+        );
+    }
+
+    /**
+     * @param string $packageName
+     * @param bool $expectation
+     * @dataProvider providePlatformPackages
+     */
+    public function testValidPlatformPackages($packageName, $expectation)
+    {
+        self::assertSame($expectation, PlatformRepository::isPlatformPackage($packageName));
+    }
 }
 
 class ResourceBundleStub
 {
     const STUB_VERSION = '32.0.1';
 
+    /**
+     * @param string $locale
+     * @param string $bundleName
+     * @param bool   $fallback
+     *
+     * @return ResourceBundleStub
+     */
     public static function create($locale, $bundleName, $fallback)
     {
         Assert::assertSame(3, func_num_args());
@@ -1208,6 +1295,11 @@ class ResourceBundleStub
         return new self();
     }
 
+    /**
+     * @param string|int $field
+     *
+     * @return string
+     */
     public function get($field)
     {
         Assert::assertSame(1, func_num_args());
@@ -1219,13 +1311,23 @@ class ResourceBundleStub
 
 class ImagickStub
 {
+    /**
+     * @var string
+     */
     private $versionString;
 
+    /**
+     * @param string $versionString
+     */
     public function __construct($versionString)
     {
         $this->versionString = $versionString;
     }
 
+    /**
+     * @return array<string, string>
+     * @phpstan-return array{versionString: string}
+     */
     public function getVersion()
     {
         Assert::assertSame(0, func_num_args());

@@ -36,7 +36,7 @@ class PathDownloader extends FileDownloader implements VcsCapableDownloaderInter
     const STRATEGY_MIRROR = 20;
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public function download(PackageInterface $package, $path, PackageInterface $prevPackage = null, $output = true)
     {
@@ -72,7 +72,7 @@ class PathDownloader extends FileDownloader implements VcsCapableDownloaderInter
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritDoc
      */
     public function install(PackageInterface $package, $path, $output = true)
     {
@@ -126,7 +126,7 @@ class PathDownloader extends FileDownloader implements VcsCapableDownloaderInter
                     }
                 }
             } catch (IOException $e) {
-                if (in_array(self::STRATEGY_MIRROR, $allowedStrategies)) {
+                if (in_array(self::STRATEGY_MIRROR, $allowedStrategies, true)) {
                     if ($output) {
                         $this->io->writeError('');
                         $this->io->writeError('    <error>Symlink failed, fallback to use mirroring!</error>');
@@ -158,7 +158,7 @@ class PathDownloader extends FileDownloader implements VcsCapableDownloaderInter
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function remove(PackageInterface $package, $path, $output = true)
     {
@@ -184,7 +184,14 @@ class PathDownloader extends FileDownloader implements VcsCapableDownloaderInter
             return \React\Promise\resolve();
         }
 
-        if (realpath($path) === realpath($package->getDistUrl())) {
+        // ensure that the source path (dist url) is not the same as the install path, which
+        // can happen when using custom installers, see https://github.com/composer/composer/pull/9116
+        // not using realpath here as we do not want to resolve the symlink to the original dist url
+        // it points to
+        $fs = new Filesystem;
+        $absPath = $fs->isAbsolutePath($path) ? $path : getcwd() . '/' . $path;
+        $absDistUrl = $fs->isAbsolutePath($package->getDistUrl()) ? $package->getDistUrl() : getcwd() . '/' . $package->getDistUrl();
+        if ($fs->normalizePath($absPath) === $fs->normalizePath($absDistUrl)) {
             if ($output) {
                 $this->io->writeError("  - " . UninstallOperation::format($package).", source is still present in $path");
             }
@@ -196,7 +203,7 @@ class PathDownloader extends FileDownloader implements VcsCapableDownloaderInter
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function getVcsReference(PackageInterface $package, $path)
     {
@@ -214,7 +221,7 @@ class PathDownloader extends FileDownloader implements VcsCapableDownloaderInter
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     protected function getInstallOperationAppendix(PackageInterface $package, $path)
     {
@@ -237,13 +244,18 @@ class PathDownloader extends FileDownloader implements VcsCapableDownloaderInter
         return ': Mirroring from '.$package->getDistUrl();
     }
 
+    /**
+     * @param mixed[] $transportOptions
+     *
+     * @phpstan-return array{self::STRATEGY_*, non-empty-list<self::STRATEGY_*>}
+     */
     private function computeAllowedStrategies(array $transportOptions)
     {
         // When symlink transport option is null, both symlink and mirror are allowed
         $currentStrategy = self::STRATEGY_SYMLINK;
         $allowedStrategies = array(self::STRATEGY_SYMLINK, self::STRATEGY_MIRROR);
 
-        $mirrorPathRepos = getenv('COMPOSER_MIRROR_PATH_REPOS');
+        $mirrorPathRepos = Platform::getEnv('COMPOSER_MIRROR_PATH_REPOS');
         if ($mirrorPathRepos) {
             $currentStrategy = self::STRATEGY_MIRROR;
         }
@@ -260,6 +272,9 @@ class PathDownloader extends FileDownloader implements VcsCapableDownloaderInter
 
         // Check we can use junctions safely if we are on Windows
         if (Platform::isWindows() && self::STRATEGY_SYMLINK === $currentStrategy && !$this->safeJunctions()) {
+            if (!in_array(self::STRATEGY_MIRROR, $allowedStrategies, true)) {
+                throw new \RuntimeException('You are on an old Windows / old PHP combo which does not allow Composer to use junctions/symlinks and this path repository has symlink:true in its options so copying is not allowed');
+            }
             $currentStrategy = self::STRATEGY_MIRROR;
             $allowedStrategies = array(self::STRATEGY_MIRROR);
         }

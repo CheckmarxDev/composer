@@ -13,24 +13,31 @@
 namespace Composer\Test;
 
 use Composer\DependencyResolver\Request;
+use Composer\Filter\PlatformRequirementFilter\PlatformRequirementFilterFactory;
 use Composer\Installer;
+use Composer\Pcre\Preg;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputOption;
 use Composer\IO\BufferIO;
+use Composer\Config;
 use Composer\Json\JsonFile;
 use Composer\Package\Dumper\ArrayDumper;
 use Composer\Util\Filesystem;
 use Composer\Repository\ArrayRepository;
 use Composer\Repository\RepositoryManager;
+use Composer\Repository\RepositoryInterface;
 use Composer\Repository\InstalledArrayRepository;
 use Composer\Package\RootPackageInterface;
+use Composer\Package\BasePackage;
+use Composer\Package\PackageInterface;
 use Composer\Package\Link;
 use Composer\Package\Locker;
 use Composer\Test\Mock\FactoryMock;
 use Composer\Test\Mock\InstalledFilesystemRepositoryMock;
 use Composer\Test\Mock\InstallationManagerMock;
+use Composer\Util\Platform;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Console\Output\StreamOutput;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -38,7 +45,9 @@ use Symfony\Component\Console\Formatter\OutputFormatter;
 
 class InstallerTest extends TestCase
 {
+    /** @var string */
     protected $prevCwd;
+    /** @var ?string */
     protected $tempComposerHome;
 
     public function setUp()
@@ -49,8 +58,10 @@ class InstallerTest extends TestCase
 
     public function tearDown()
     {
+        Platform::clearEnv('COMPOSER_POOL_OPTIMIZER');
+
         chdir($this->prevCwd);
-        if (is_dir($this->tempComposerHome)) {
+        if (isset($this->tempComposerHome) && is_dir($this->tempComposerHome)) {
             $fs = new Filesystem;
             $fs->removeDirectory($this->tempComposerHome);
         }
@@ -58,6 +69,9 @@ class InstallerTest extends TestCase
 
     /**
      * @dataProvider provideInstaller
+     * @param RootPackageInterface&BasePackage $rootPackage
+     * @param RepositoryInterface[] $repositories
+     * @param mixed[] $options
      */
     public function testInstaller(RootPackageInterface $rootPackage, $repositories, array $options)
     {
@@ -67,6 +81,21 @@ class InstallerTest extends TestCase
             ->setConstructorArgs(array($io))
             ->getMock();
         $config = $this->getMockBuilder('Composer\Config')->getMock();
+        $config->expects($this->any())
+            ->method('get')
+            ->will($this->returnCallback(function ($key) {
+                switch ($key) {
+                    case 'vendor-dir':
+                        return 'foo';
+                    case 'lock':
+                    case 'notify-on-install':
+                        return true;
+                    case 'platform':
+                        return array();
+                }
+
+                throw new \UnexpectedValueException('Unknown key '.$key);
+            }));
 
         $eventDispatcher = $this->getMockBuilder('Composer\EventDispatcher\EventDispatcher')->disableOriginalConstructor()->getMock();
         $httpDownloader = $this->getMockBuilder('Composer\Util\HttpDownloader')->disableOriginalConstructor()->getMock();
@@ -82,6 +111,7 @@ class InstallerTest extends TestCase
         $installationManager = new InstallationManagerMock();
 
         // emulate a writable lock file
+        /** @var ?string $lockData */
         $lockData = null;
         $lockJsonMock = $this->getMockBuilder('Composer\Json\JsonFile')->disableOriginalConstructor()->getMock();
         $lockJsonMock->expects($this->any())
@@ -125,6 +155,10 @@ class InstallerTest extends TestCase
         $this->assertSame($expectedUninstalled, $uninstalled);
     }
 
+    /**
+     * @param  PackageInterface[] $packages
+     * @return mixed[]
+     */
     protected function makePackagesComparable($packages)
     {
         $dumper = new ArrayDumper();
@@ -187,17 +221,90 @@ class InstallerTest extends TestCase
 
     /**
      * @group slow
-     * @dataProvider getSlowIntegrationTests
+     * @dataProvider provideSlowIntegrationTests
+     * @param string $file
+     * @param string $message
+     * @param ?string $condition
+     * @param Config $composerConfig
+     * @param ?mixed[] $lock
+     * @param ?mixed[] $installed
+     * @param string $run
+     * @param mixed[]|false $expectLock
+     * @param ?mixed[] $expectInstalled
+     * @param ?string $expectOutput
+     * @param ?string $expectOutputOptimized
+     * @param string $expect
+     * @param int|string $expectResult
      */
-    public function testSlowIntegration($file, $message, $condition, $composerConfig, $lock, $installed, $run, $expectLock, $expectInstalled, $expectOutput, $expect, $expectResult)
+    public function testSlowIntegration($file, $message, $condition, $composerConfig, $lock, $installed, $run, $expectLock, $expectInstalled, $expectOutput, $expectOutputOptimized, $expect, $expectResult)
     {
-        return $this->testIntegration($file, $message, $condition, $composerConfig, $lock, $installed, $run, $expectLock, $expectInstalled, $expectOutput, $expect, $expectResult);
+        Platform::putEnv('COMPOSER_POOL_OPTIMIZER', '0');
+
+        $this->doTestIntegration($file, $message, $condition, $composerConfig, $lock, $installed, $run, $expectLock, $expectInstalled, $expectOutput, $expect, $expectResult);
     }
 
     /**
-     * @dataProvider getIntegrationTests
+     * @dataProvider provideIntegrationTests
+     * @param string $file
+     * @param string $message
+     * @param ?string $condition
+     * @param Config $composerConfig
+     * @param ?mixed[] $lock
+     * @param ?mixed[] $installed
+     * @param string $run
+     * @param mixed[]|false $expectLock
+     * @param ?mixed[] $expectInstalled
+     * @param ?string $expectOutput
+     * @param ?string $expectOutputOptimized
+     * @param string $expect
+     * @param int|string $expectResult
      */
-    public function testIntegration($file, $message, $condition, $composerConfig, $lock, $installed, $run, $expectLock, $expectInstalled, $expectOutput, $expect, $expectResult)
+    public function testIntegrationWithPoolOptimizer($file, $message, $condition, $composerConfig, $lock, $installed, $run, $expectLock, $expectInstalled, $expectOutput, $expectOutputOptimized, $expect, $expectResult)
+    {
+        Platform::putEnv('COMPOSER_POOL_OPTIMIZER', '1');
+
+        $this->doTestIntegration($file, $message, $condition, $composerConfig, $lock, $installed, $run, $expectLock, $expectInstalled, $expectOutputOptimized ?: $expectOutput, $expect, $expectResult);
+    }
+
+    /**
+     * @dataProvider provideIntegrationTests
+     * @param string $file
+     * @param string $message
+     * @param ?string $condition
+     * @param Config $composerConfig
+     * @param ?mixed[] $lock
+     * @param ?mixed[] $installed
+     * @param string $run
+     * @param mixed[]|false $expectLock
+     * @param ?mixed[] $expectInstalled
+     * @param ?string $expectOutput
+     * @param ?string $expectOutputOptimized
+     * @param string $expect
+     * @param int|string $expectResult
+     */
+    public function testIntegrationWithRawPool($file, $message, $condition, $composerConfig, $lock, $installed, $run, $expectLock, $expectInstalled, $expectOutput, $expectOutputOptimized, $expect, $expectResult)
+    {
+        Platform::putEnv('COMPOSER_POOL_OPTIMIZER', '0');
+
+        $this->doTestIntegration($file, $message, $condition, $composerConfig, $lock, $installed, $run, $expectLock, $expectInstalled, $expectOutput, $expect, $expectResult);
+    }
+
+    /**
+     * @param string $file
+     * @param string $message
+     * @param ?string $condition
+     * @param Config $composerConfig
+     * @param ?mixed[] $lock
+     * @param ?mixed[] $installed
+     * @param string $run
+     * @param mixed[]|false $expectLock
+     * @param ?mixed[] $expectInstalled
+     * @param ?string $expectOutput
+     * @param string $expect
+     * @param int|string $expectResult
+     * @return void
+     */
+    private function doTestIntegration($file, $message, $condition, $composerConfig, $lock, $installed, $run, $expectLock, $expectInstalled, $expectOutput, $expect, $expectResult)
     {
         if ($condition) {
             eval('$res = '.$condition.';');
@@ -287,7 +394,7 @@ class InstallerTest extends TestCase
             $installer
                 ->setDevMode(!$input->getOption('no-dev'))
                 ->setDryRun($input->getOption('dry-run'))
-                ->setIgnorePlatformRequirements($ignorePlatformReqs);
+                ->setPlatformRequirementFilter(PlatformRequirementFilterFactory::fromBoolOrList($ignorePlatformReqs));
 
             return $installer->run();
         });
@@ -332,13 +439,13 @@ class InstallerTest extends TestCase
                 ->setUpdateAllowTransitiveDependencies($updateAllowTransitiveDependencies)
                 ->setPreferStable($input->getOption('prefer-stable'))
                 ->setPreferLowest($input->getOption('prefer-lowest'))
-                ->setIgnorePlatformRequirements($ignorePlatformReqs);
+                ->setPlatformRequirementFilter(PlatformRequirementFilterFactory::fromBoolOrList($ignorePlatformReqs));
 
             return $installer->run();
         });
         $application->add($update);
 
-        if (!preg_match('{^(install|update)\b}', $run)) {
+        if (!Preg::isMatch('{^(install|update)\b}', $run)) {
             throw new \UnexpectedValueException('The run command only supports install and update');
         }
 
@@ -383,30 +490,34 @@ class InstallerTest extends TestCase
         $this->assertSame(rtrim($expect), implode("\n", $installationManager->getTrace()));
 
         if ($expectOutput) {
-            $output = preg_replace('{^    - .*?\.ini$}m', '__inilist__', $output);
-            $output = preg_replace('{(__inilist__\r?\n)+}', "__inilist__\n", $output);
+            $output = Preg::replace('{^    - .*?\.ini$}m', '__inilist__', $output);
+            $output = Preg::replace('{(__inilist__\r?\n)+}', "__inilist__\n", $output);
 
             $this->assertStringMatchesFormat(rtrim($expectOutput), rtrim($output));
         }
     }
 
-    public function getSlowIntegrationTests()
+    public function provideSlowIntegrationTests()
     {
         return $this->loadIntegrationTests('installer-slow/');
     }
 
-    public function getIntegrationTests()
+    public function provideIntegrationTests()
     {
         return $this->loadIntegrationTests('installer/');
     }
 
+    /**
+     * @param  string $path
+     * @return mixed[]
+     */
     public function loadIntegrationTests($path)
     {
         $fixturesDir = realpath(__DIR__.'/Fixtures/'.$path);
         $tests = array();
 
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($fixturesDir), \RecursiveIteratorIterator::LEAVES_ONLY) as $file) {
-            if (!preg_match('/\.test$/', $file)) {
+            if (!Preg::isMatch('/\.test$/', $file)) {
                 continue;
             }
 
@@ -431,7 +542,7 @@ class InstallerTest extends TestCase
                         }
 
                         // Change paths like file://foobar to file:///path/to/fixtures
-                        if (preg_match('{^file://[^/]}', $repo['url'])) {
+                        if (Preg::isMatch('{^file://[^/]}', $repo['url'])) {
                             $repo['url'] = 'file://' . strtr($fixturesDir, '\\', '/') . '/' . substr($repo['url'], 7);
                         }
 
@@ -460,6 +571,7 @@ class InstallerTest extends TestCase
                     $expectInstalled = JsonFile::parseJson($testData['EXPECT-INSTALLED']);
                 }
                 $expectOutput = isset($testData['EXPECT-OUTPUT']) ? $testData['EXPECT-OUTPUT'] : null;
+                $expectOutputOptimized = isset($testData['EXPECT-OUTPUT-OPTIMIZED']) ? $testData['EXPECT-OUTPUT-OPTIMIZED'] : null;
                 $expect = $testData['EXPECT'];
                 if (!empty($testData['EXPECT-EXCEPTION'])) {
                     $expectResult = $testData['EXPECT-EXCEPTION'];
@@ -475,15 +587,19 @@ class InstallerTest extends TestCase
                 die(sprintf('Test "%s" is not valid: '.$e->getMessage(), str_replace($fixturesDir.'/', '', $file)));
             }
 
-            $tests[basename($file)] = array(str_replace($fixturesDir.'/', '', $file), $message, $condition, $composer, $lock, $installed, $run, $expectLock, $expectInstalled, $expectOutput, $expect, $expectResult);
+            $tests[basename($file)] = array(str_replace($fixturesDir.'/', '', $file), $message, $condition, $composer, $lock, $installed, $run, $expectLock, $expectInstalled, $expectOutput, $expectOutputOptimized, $expect, $expectResult);
         }
 
         return $tests;
     }
 
+    /**
+     * @param  string $fixturesDir
+     * @return mixed[]
+     */
     protected function readTestFile(\SplFileInfo $file, $fixturesDir)
     {
-        $tokens = preg_split('#(?:^|\n*)--([A-Z-]+)--\n#', file_get_contents($file->getRealPath()), null, PREG_SPLIT_DELIM_CAPTURE);
+        $tokens = Preg::split('#(?:^|\n*)--([A-Z-]+)--\n#', file_get_contents($file->getRealPath()), -1, PREG_SPLIT_DELIM_CAPTURE);
 
         $sectionInfo = array(
             'TEST' => true,
@@ -495,6 +611,7 @@ class InstallerTest extends TestCase
             'EXPECT-LOCK' => false,
             'EXPECT-INSTALLED' => false,
             'EXPECT-OUTPUT' => false,
+            'EXPECT-OUTPUT-OPTIMIZED' => false,
             'EXPECT-EXIT-CODE' => false,
             'EXPECT-EXCEPTION' => false,
             'EXPECT' => true,

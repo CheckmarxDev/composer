@@ -18,6 +18,13 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class ApplicationTest extends TestCase
 {
+    public function tearDown()
+    {
+        parent::tearDown();
+
+        putenv('COMPOSER_NO_INTERACTION');
+    }
+
     public function testDevWarning()
     {
         $application = new Application;
@@ -32,6 +39,11 @@ class ApplicationTest extends TestCase
             ->method('hasParameterOption')
             ->with($this->equalTo('--no-plugins'))
             ->will($this->returnValue(true));
+
+        $inputMock->expects($this->at($index++))
+            ->method('hasParameterOption')
+            ->with($this->equalTo('--no-scripts'))
+            ->will($this->returnValue(false));
 
         $inputMock->expects($this->at($index++))
             ->method('setInteractive')
@@ -55,15 +67,15 @@ class ApplicationTest extends TestCase
         $outputMock->expects($this->at($index++))
             ->method("write");
 
-        // if (XdebugHandler::isXdebugActive()) {
-        //     $outputMock->expects($this->at($index++))
-        //         ->method("getVerbosity")
-        //         ->willReturn(OutputInterface::VERBOSITY_NORMAL);
+        if (XdebugHandler::isXdebugActive()) {
+            $outputMock->expects($this->at($index++))
+                ->method("getVerbosity")
+                ->willReturn(OutputInterface::VERBOSITY_NORMAL);
 
-        //     $outputMock->expects($this->at($index++))
-        //         ->method("write")
-        //         ->with($this->equalTo('<warning>Composer is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>'));
-        // }
+            $outputMock->expects($this->at($index++))
+                ->method("write")
+                ->with($this->equalTo('<warning>Composer is operating slower than normal because you have Xdebug enabled. See https://getcomposer.org/xdebug</warning>'));
+        }
 
         $outputMock->expects($this->at($index++))
             ->method("getVerbosity")
@@ -80,6 +92,10 @@ class ApplicationTest extends TestCase
         $application->doRun($inputMock, $outputMock);
     }
 
+    /**
+     * @param  string $command
+     * @return void
+     */
     public function ensureNoDevWarning($command)
     {
         $application = new Application;
@@ -96,6 +112,11 @@ class ApplicationTest extends TestCase
             ->method('hasParameterOption')
             ->with($this->equalTo('--no-plugins'))
             ->will($this->returnValue(true));
+
+        $inputMock->expects($this->at($index++))
+            ->method('hasParameterOption')
+            ->with($this->equalTo('--no-scripts'))
+            ->will($this->returnValue(false));
 
         $inputMock->expects($this->at($index++))
             ->method('setInteractive')

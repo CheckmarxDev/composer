@@ -13,8 +13,8 @@
 namespace Composer\Util;
 
 use Composer\IO\IOInterface;
+use Composer\Pcre\Preg;
 use Symfony\Component\Process\Process;
-use Symfony\Component\Process\ProcessUtils;
 use Symfony\Component\Process\Exception\RuntimeException;
 use React\Promise\Promise;
 use React\Promise\PromiseInterface;
@@ -31,19 +31,27 @@ class ProcessExecutor
     const STATUS_FAILED = 4;
     const STATUS_ABORTED = 5;
 
+    /** @var int */
     protected static $timeout = 300;
 
-    protected $captureOutput;
-    protected $errorOutput;
+    /** @var bool */
+    protected $captureOutput = false;
+    /** @var string */
+    protected $errorOutput = '';
+    /** @var ?IOInterface */
     protected $io;
 
     /**
      * @phpstan-var array<int, array<string, mixed>>
      */
     private $jobs = array();
+    /** @var int */
     private $runningJobs = 0;
+    /** @var int */
     private $maxJobs = 10;
+    /** @var int */
     private $idGen = 0;
+    /** @var bool */
     private $allowAsync = false;
 
     public function __construct(IOInterface $io = null)
@@ -54,11 +62,11 @@ class ProcessExecutor
     /**
      * runs a process on the commandline
      *
-     * @param  string $command the command to execute
-     * @param  mixed  $output  the output will be written into this var if passed by ref
-     *                         if a callable is passed it will be used as output handler
-     * @param  string $cwd     the working directory
-     * @return int    statuscode
+     * @param  string  $command the command to execute
+     * @param  mixed   $output  the output will be written into this var if passed by ref
+     *                          if a callable is passed it will be used as output handler
+     * @param  ?string $cwd     the working directory
+     * @return int     statuscode
      */
     public function execute($command, &$output = null, $cwd = null)
     {
@@ -72,9 +80,9 @@ class ProcessExecutor
     /**
      * runs a process on the commandline in TTY mode
      *
-     * @param  string $command the command to execute
-     * @param  string $cwd     the working directory
-     * @return int    statuscode
+     * @param  string  $command the command to execute
+     * @param  ?string $cwd     the working directory
+     * @return int     statuscode
      */
     public function executeTty($command, $cwd = null)
     {
@@ -85,20 +93,16 @@ class ProcessExecutor
         return $this->doExecute($command, $cwd, false);
     }
 
+    /**
+     * @param  string  $command
+     * @param  ?string $cwd
+     * @param  bool    $tty
+     * @param  mixed   $output
+     * @return int
+     */
     private function doExecute($command, $cwd, $tty, &$output = null)
     {
-        if ($this->io && $this->io->isDebug()) {
-            $safeCommand = preg_replace_callback('{://(?P<user>[^:/\s]+):(?P<password>[^@\s/]+)@}i', function ($m) {
-                // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx) we obfuscate that
-                if (preg_match('{^([a-f0-9]{12,}|gh[a-z]_[a-zA-Z0-9_]+)$}', $m['user'])) {
-                    return '://***:***@';
-                }
-
-                return '://'.$m['user'].':***@';
-            }, $command);
-            $safeCommand = preg_replace("{--password (.*[^\\\\]\') }", '--password \'***\' ', $safeCommand);
-            $this->io->writeError('Executing command ('.($cwd ?: 'CWD').'): '.$safeCommand);
-        }
+        $this->outputCommandRun($command, $cwd, false);
 
         // TODO in 2.2, these two checks can be dropped as Symfony 4+ supports them out of the box
         // make sure that null translate to the proper directory in case the dir is a symlink
@@ -113,12 +117,13 @@ class ProcessExecutor
         }
 
         $this->captureOutput = func_num_args() > 3;
-        $this->errorOutput = null;
+        $this->errorOutput = '';
 
         // TODO in v3, commands should be passed in as arrays of cmd + args
         if (method_exists('Symfony\Component\Process\Process', 'fromShellCommandline')) {
             $process = Process::fromShellCommandline($command, $cwd, null, null, static::getTimeout());
         } else {
+            /** @phpstan-ignore-next-line */
             $process = new Process($command, $cwd, null, null, static::getTimeout());
         }
         if (!Platform::isWindows() && $tty) {
@@ -217,6 +222,10 @@ class ProcessExecutor
         return $promise;
     }
 
+    /**
+     * @param  int  $id
+     * @return void
+     */
     private function startJob($id)
     {
         $job = &$this->jobs[$id];
@@ -231,17 +240,7 @@ class ProcessExecutor
         $command = $job['command'];
         $cwd = $job['cwd'];
 
-        if ($this->io && $this->io->isDebug()) {
-            $safeCommand = preg_replace_callback('{://(?P<user>[^:/\s]+):(?P<password>[^@\s/]+)@}i', function ($m) {
-                if (preg_match('{^[a-f0-9]{12,}$}', $m['user'])) {
-                    return '://***:***@';
-                }
-
-                return '://'.$m['user'].':***@';
-            }, $command);
-            $safeCommand = preg_replace("{--password (.*[^\\\\]\') }", '--password \'***\' ', $safeCommand);
-            $this->io->writeError('Executing async command ('.($cwd ?: 'CWD').'): '.$safeCommand);
-        }
+        $this->outputCommandRun($command, $cwd, true);
 
         // TODO in 2.2, these two checks can be dropped as Symfony 4+ supports them out of the box
         // make sure that null translate to the proper directory in case the dir is a symlink
@@ -255,18 +254,42 @@ class ProcessExecutor
             // throw new \RuntimeException('The given CWD for the process does not exist: '.$cwd);
         }
 
-        // TODO in v3, commands should be passed in as arrays of cmd + args
-        if (method_exists('Symfony\Component\Process\Process', 'fromShellCommandline')) {
-            $process = Process::fromShellCommandline($command, $cwd, null, null, static::getTimeout());
-        } else {
-            $process = new Process($command, $cwd, null, null, static::getTimeout());
+        try {
+            // TODO in v3, commands should be passed in as arrays of cmd + args
+            if (method_exists('Symfony\Component\Process\Process', 'fromShellCommandline')) {
+                $process = Process::fromShellCommandline($command, $cwd, null, null, static::getTimeout());
+            } else {
+                $process = new Process($command, $cwd, null, null, static::getTimeout());
+            }
+        } catch (\Exception $e) {
+            call_user_func($job['reject'], $e);
+
+            return;
+        } catch (\Throwable $e) {
+            call_user_func($job['reject'], $e);
+
+            return;
         }
 
         $job['process'] = $process;
 
-        $process->start();
+        try {
+            $process->start();
+        } catch (\Exception $e) {
+            call_user_func($job['reject'], $e);
+
+            return;
+        } catch (\Throwable $e) {
+            call_user_func($job['reject'], $e);
+
+            return;
+        }
     }
 
+    /**
+     * @param  ?int $index job id
+     * @return void
+     */
     public function wait($index = null)
     {
         while (true) {
@@ -280,6 +303,8 @@ class ProcessExecutor
 
     /**
      * @internal
+     *
+     * @return void
      */
     public function enableAsync()
     {
@@ -289,7 +314,8 @@ class ProcessExecutor
     /**
      * @internal
      *
-     * @return int number of active (queued or started) jobs
+     * @param  ?int $index job id
+     * @return int         number of active (queued or started) jobs
      */
     public function countActiveJobs($index = null)
     {
@@ -299,6 +325,8 @@ class ProcessExecutor
                 if (!$job['process']->isRunning()) {
                     call_user_func($job['resolve'], $job['process']);
                 }
+
+                $job['process']->checkTimeout();
             }
 
             if ($this->runningJobs < $this->maxJobs) {
@@ -326,6 +354,8 @@ class ProcessExecutor
 
     /**
      * @private
+     *
+     * @return void
      */
     public function markJobDone()
     {
@@ -333,13 +363,14 @@ class ProcessExecutor
     }
 
     /**
+     * @param  ?string  $output
      * @return string[]
      */
     public function splitLines($output)
     {
-        $output = trim($output);
+        $output = trim((string) $output);
 
-        return ((string) $output === '') ? array() : preg_split('{\r?\n}', $output);
+        return $output === '' ? array() : Preg::split('{\r?\n}', $output);
     }
 
     /**
@@ -352,6 +383,14 @@ class ProcessExecutor
         return $this->errorOutput;
     }
 
+    /**
+     * @private
+     *
+     * @param Process::ERR|Process::OUT $type
+     * @param string                    $buffer
+     *
+     * @return void
+     */
     public function outputHandler($type, $buffer)
     {
         if ($this->captureOutput) {
@@ -380,7 +419,8 @@ class ProcessExecutor
     }
 
     /**
-     * @param int $timeout the timeout in seconds
+     * @param  int  $timeout the timeout in seconds
+     * @return void
      */
     public static function setTimeout($timeout)
     {
@@ -390,7 +430,7 @@ class ProcessExecutor
     /**
      * Escapes a string to be used as a shell argument.
      *
-     * @param string $argument The argument that will be escaped
+     * @param string|false|null $argument The argument that will be escaped
      *
      * @return string The escaped argument
      */
@@ -400,52 +440,77 @@ class ProcessExecutor
     }
 
     /**
-     * Copy of ProcessUtils::escapeArgument() that is deprecated in Symfony 3.3 and removed in Symfony 4.
+     * @param string  $command
+     * @param ?string $cwd
+     * @param bool    $async
+     * @return void
+     */
+    private function outputCommandRun($command, $cwd, $async)
+    {
+        if (null === $this->io || !$this->io->isDebug()) {
+            return;
+        }
+
+        $safeCommand = Preg::replaceCallback('{://(?P<user>[^:/\s]+):(?P<password>[^@\s/]+)@}i', function ($m) {
+            // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx) we obfuscate that
+            if (Preg::isMatch('{^([a-f0-9]{12,}|gh[a-z]_[a-zA-Z0-9_]+)$}', $m['user'])) {
+                return '://***:***@';
+            }
+            if (Preg::isMatch('{^[a-f0-9]{12,}$}', $m['user'])) {
+                return '://***:***@';
+            }
+
+            return '://'.$m['user'].':***@';
+        }, $command);
+        $safeCommand = Preg::replace("{--password (.*[^\\\\]\') }", '--password \'***\' ', $safeCommand);
+        $this->io->writeError('Executing'.($async ? ' async' : '').' command ('.($cwd ?: 'CWD').'): '.$safeCommand);
+    }
+
+    /**
+     * Escapes a string to be used as a shell argument for Symfony Process.
      *
-     * @param string $argument
+     * This method expects cmd.exe to be started with the /V:ON option, which
+     * enables delayed environment variable expansion using ! as the delimiter.
+     * If this is not the case, any escaped ^^!var^^! will be transformed to
+     * ^!var^! and introduce two unintended carets.
+     *
+     * Modified from https://github.com/johnstevenson/winbox-args
+     * MIT Licensed (c) John Stevenson <john-stevenson@blueyonder.co.uk>
+     *
+     * @param string|false|null $argument
      *
      * @return string
      */
     private static function escapeArgument($argument)
     {
-        //Fix for PHP bug #43784 escapeshellarg removes % from given string
-        //Fix for PHP bug #49446 escapeshellarg doesn't work on Windows
-        //@see https://bugs.php.net/bug.php?id=43784
-        //@see https://bugs.php.net/bug.php?id=49446
-        if ('\\' === DIRECTORY_SEPARATOR) {
-            if ((string) $argument === '') {
-                return escapeshellarg($argument);
-            }
-
-            $escapedArgument = '';
-            $quote = false;
-            foreach (preg_split('/(")/', $argument, -1, PREG_SPLIT_NO_EMPTY | PREG_SPLIT_DELIM_CAPTURE) as $part) {
-                if ('"' === $part) {
-                    $escapedArgument .= '\\"';
-                } elseif (self::isSurroundedBy($part, '%')) {
-                    // Avoid environment variable expansion
-                    $escapedArgument .= '^%"'.substr($part, 1, -1).'"^%';
-                } else {
-                    // escape trailing backslash
-                    if ('\\' === substr($part, -1)) {
-                        $part .= '\\';
-                    }
-                    $quote = true;
-                    $escapedArgument .= $part;
-                }
-            }
-            if ($quote) {
-                $escapedArgument = '"'.$escapedArgument.'"';
-            }
-
-            return $escapedArgument;
+        if ('' === ($argument = (string) $argument)) {
+            return escapeshellarg($argument);
         }
 
-        return "'".str_replace("'", "'\\''", $argument)."'";
-    }
+        if (!Platform::isWindows()) {
+            return "'".str_replace("'", "'\\''", $argument)."'";
+        }
 
-    private static function isSurroundedBy($arg, $char)
-    {
-        return 2 < strlen($arg) && $char === $arg[0] && $char === $arg[strlen($arg) - 1];
+        // New lines break cmd.exe command parsing
+        $argument = strtr($argument, "\n", ' ');
+
+        $quote = strpbrk($argument, " \t") !== false;
+        $argument = Preg::replace('/(\\\\*)"/', '$1$1\\"', $argument, -1, $dquotes);
+        $meta = $dquotes || Preg::isMatch('/%[^%]+%|![^!]+!/', $argument);
+
+        if (!$meta && !$quote) {
+            $quote = strpbrk($argument, '^&|<>()') !== false;
+        }
+
+        if ($quote) {
+            $argument = '"'.Preg::replace('/(\\\\*)$/', '$1$1', $argument).'"';
+        }
+
+        if ($meta) {
+            $argument = Preg::replace('/(["^&|<>()%])/', '^$1', $argument);
+            $argument = Preg::replace('/(!)/', '^^$1', $argument);
+        }
+
+        return $argument;
     }
 }

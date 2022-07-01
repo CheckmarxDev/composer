@@ -20,11 +20,16 @@ use Composer\Config;
  */
 class Versions
 {
+    /** @var string[] */
     public static $channels = array('stable', 'preview', 'snapshot', '1', '2');
 
+    /** @var HttpDownloader */
     private $httpDownloader;
+    /** @var Config */
     private $config;
+    /** @var string */
     private $channel;
+    /** @var array<string, array<int, array{path: string, version: string, min-php: int}>> */
     private $versionsData;
 
     public function __construct(Config $config, HttpDownloader $httpDownloader)
@@ -33,6 +38,9 @@ class Versions
         $this->config = $config;
     }
 
+    /**
+     * @return string
+     */
     public function getChannel()
     {
         if ($this->channel) {
@@ -50,6 +58,11 @@ class Versions
         return $this->channel = 'stable';
     }
 
+    /**
+     * @param string $channel
+     *
+     * @return void
+     */
     public function setChannel($channel)
     {
         if (!in_array($channel, self::$channels, true)) {
@@ -61,6 +74,11 @@ class Versions
         file_put_contents($channelFile, (is_numeric($channel) ? 'stable' : $channel).PHP_EOL);
     }
 
+    /**
+     * @param string|null $channel
+     *
+     * @return array{path: string, version: string, min-php: int}
+     */
     public function getLatest($channel = null)
     {
         $versions = $this->getVersionsData();
@@ -74,6 +92,9 @@ class Versions
         throw new \UnexpectedValueException('There is no version of Composer available for your PHP version ('.PHP_VERSION.')');
     }
 
+    /**
+     * @return array<string, array<int, array{path: string, version: string, min-php: int}>>
+     */
     private function getVersionsData()
     {
         if (!$this->versionsData) {

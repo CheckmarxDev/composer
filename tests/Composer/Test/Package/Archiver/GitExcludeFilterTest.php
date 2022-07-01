@@ -18,20 +18,23 @@ use Composer\Test\TestCase;
 class GitExcludeFilterTest extends TestCase
 {
     /**
-     * @dataProvider patterns
+     * @dataProvider providePatterns
+     *
+     * @param string  $ignore
+     * @param mixed[] $expected
      */
     public function testPatternEscape($ignore, $expected)
     {
         $filter = new GitExcludeFilter('/');
 
-        $this->assertEquals($expected, $filter->parseGitIgnoreLine($ignore));
+        $this->assertEquals($expected, $filter->parseGitAttributesLine($ignore));
     }
 
-    public function patterns()
+    public function providePatterns()
     {
         return array(
-            array('app/config/parameters.yml', array('{(?=[^\.])app/(?=[^\.])config/(?=[^\.])parameters\.yml(?=$|/)}', false, false)),
-            array('!app/config/parameters.yml', array('{(?=[^\.])app/(?=[^\.])config/(?=[^\.])parameters\.yml(?=$|/)}', true, false)),
+            array('app/config/parameters.yml export-ignore', array('{(?=[^\.])app/(?=[^\.])config/(?=[^\.])parameters\.yml(?=$|/)}', false, false)),
+            array('app/config/parameters.yml -export-ignore', array('{(?=[^\.])app/(?=[^\.])config/(?=[^\.])parameters\.yml(?=$|/)}', true, false)),
         );
     }
 }

@@ -14,12 +14,14 @@ namespace Composer\Installer;
 
 use Composer\Composer;
 use Composer\IO\IOInterface;
+use Composer\Pcre\Preg;
 use Composer\Repository\InstalledRepositoryInterface;
 use Composer\Package\PackageInterface;
 use Composer\Util\Filesystem;
 use Composer\Util\Silencer;
 use Composer\Util\Platform;
 use React\Promise\PromiseInterface;
+use Composer\Downloader\DownloadManager;
 
 /**
  * Package installation manager.
@@ -29,14 +31,19 @@ use React\Promise\PromiseInterface;
  */
 class LibraryInstaller implements InstallerInterface, BinaryPresenceInterface
 {
+    /** @var Composer */
     protected $composer;
+    /** @var string */
     protected $vendorDir;
-    protected $binDir;
+    /** @var DownloadManager */
     protected $downloadManager;
+    /** @var IOInterface */
     protected $io;
+    /** @var string */
     protected $type;
+    /** @var Filesystem */
     protected $filesystem;
-    protected $binCompat;
+    /** @var BinaryInstaller */
     protected $binaryInstaller;
 
     /**
@@ -57,11 +64,11 @@ class LibraryInstaller implements InstallerInterface, BinaryPresenceInterface
 
         $this->filesystem = $filesystem ?: new Filesystem();
         $this->vendorDir = rtrim($composer->getConfig()->get('vendor-dir'), '/');
-        $this->binaryInstaller = $binaryInstaller ?: new BinaryInstaller($this->io, rtrim($composer->getConfig()->get('bin-dir'), '/'), $composer->getConfig()->get('bin-compat'), $this->filesystem);
+        $this->binaryInstaller = $binaryInstaller ?: new BinaryInstaller($this->io, rtrim($composer->getConfig()->get('bin-dir'), '/'), $composer->getConfig()->get('bin-compat'), $this->filesystem, $this->vendorDir);
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function supports($packageType)
     {
@@ -69,7 +76,7 @@ class LibraryInstaller implements InstallerInterface, BinaryPresenceInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function isInstalled(InstalledRepositoryInterface $repo, PackageInterface $package)
     {
@@ -87,7 +94,7 @@ class LibraryInstaller implements InstallerInterface, BinaryPresenceInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function download(PackageInterface $package, PackageInterface $prevPackage = null)
     {
@@ -98,7 +105,7 @@ class LibraryInstaller implements InstallerInterface, BinaryPresenceInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function prepare($type, PackageInterface $package, PackageInterface $prevPackage = null)
     {
@@ -109,7 +116,7 @@ class LibraryInstaller implements InstallerInterface, BinaryPresenceInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function cleanup($type, PackageInterface $package, PackageInterface $prevPackage = null)
     {
@@ -120,7 +127,7 @@ class LibraryInstaller implements InstallerInterface, BinaryPresenceInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function install(InstalledRepositoryInterface $repo, PackageInterface $package)
     {
@@ -149,7 +156,7 @@ class LibraryInstaller implements InstallerInterface, BinaryPresenceInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function update(InstalledRepositoryInterface $repo, PackageInterface $initial, PackageInterface $target)
     {
@@ -178,7 +185,7 @@ class LibraryInstaller implements InstallerInterface, BinaryPresenceInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function uninstall(InstalledRepositoryInterface $repo, PackageInterface $package)
     {
@@ -209,7 +216,7 @@ class LibraryInstaller implements InstallerInterface, BinaryPresenceInterface
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function getInstallPath(PackageInterface $package)
     {
@@ -246,12 +253,15 @@ class LibraryInstaller implements InstallerInterface, BinaryPresenceInterface
         $targetDir = $package->getTargetDir();
 
         if ($targetDir) {
-            return preg_replace('{/*'.str_replace('/', '/+', preg_quote($targetDir)).'/?$}', '', $installPath);
+            return Preg::replace('{/*'.str_replace('/', '/+', preg_quote($targetDir)).'/?$}', '', $installPath);
         }
 
         return $installPath;
     }
 
+    /**
+     * @return PromiseInterface|null
+     */
     protected function installCode(PackageInterface $package)
     {
         $downloadPath = $this->getInstallPath($package);
@@ -259,6 +269,9 @@ class LibraryInstaller implements InstallerInterface, BinaryPresenceInterface
         return $this->downloadManager->install($package, $downloadPath);
     }
 
+    /**
+     * @return PromiseInterface|null
+     */
     protected function updateCode(PackageInterface $initial, PackageInterface $target)
     {
         $initialDownloadPath = $this->getInstallPath($initial);
@@ -292,6 +305,9 @@ class LibraryInstaller implements InstallerInterface, BinaryPresenceInterface
         return $this->downloadManager->update($initial, $target, $targetDownloadPath);
     }
 
+    /**
+     * @return PromiseInterface|null
+     */
     protected function removeCode(PackageInterface $package)
     {
         $downloadPath = $this->getPackageBasePath($package);
@@ -299,6 +315,9 @@ class LibraryInstaller implements InstallerInterface, BinaryPresenceInterface
         return $this->downloadManager->remove($package, $downloadPath);
     }
 
+    /**
+     * @return void
+     */
     protected function initializeVendorDir()
     {
         $this->filesystem->ensureDirectoryExists($this->vendorDir);

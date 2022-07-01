@@ -17,19 +17,44 @@ use Composer\Test\TestCase;
 use Composer\Util\Filesystem;
 use Composer\Config;
 use Composer\Util\Perforce;
+use Composer\Test\Mock\ProcessExecutorMock;
 
 /**
  * @author Matt Whittom <Matt.Whittom@veteransunited.com>
  */
 class PerforceDriverTest extends TestCase
 {
+    /**
+     * @var Config
+     */
     protected $config;
+    /**
+     * @var \Composer\IO\IOInterface&\PHPUnit\Framework\MockObject\MockObject
+     */
     protected $io;
+    /**
+     * @var ProcessExecutorMock
+     */
     protected $process;
+    /**
+     * @var \Composer\Util\HttpDownloader&\PHPUnit\Framework\MockObject\MockObject
+     */
     protected $httpDownloader;
+    /**
+     * @var string
+     */
     protected $testPath;
+    /**
+     * @var PerforceDriver
+     */
     protected $driver;
+    /**
+     * @var array<string, string>
+     */
     protected $repoConfig;
+    /**
+     * @var Perforce&\PHPUnit\Framework\MockObject\MockObject
+     */
     protected $perforce;
 
     const TEST_URL = 'TEST_PERFORCE_URL';
@@ -40,9 +65,13 @@ class PerforceDriverTest extends TestCase
     {
         $this->testPath = $this->getUniqueTmpDirectory();
         $this->config = $this->getTestConfig($this->testPath);
-        $this->repoConfig = $this->getTestRepoConfig();
+        $this->repoConfig = array(
+            'url' => self::TEST_URL,
+            'depot' => self::TEST_DEPOT,
+            'branch' => self::TEST_BRANCH,
+        );
         $this->io = $this->getMockIOInterface();
-        $this->process = $this->getMockProcessExecutor();
+        $this->process = new ProcessExecutorMock;
         $this->httpDownloader = $this->getMockHttpDownloader();
         $this->perforce = $this->getMockPerforce();
         $this->driver = new PerforceDriver($this->repoConfig, $this->io, $this->config, $this->httpDownloader, $this->process);
@@ -54,16 +83,11 @@ class PerforceDriverTest extends TestCase
         //cleanup directory under test path
         $fs = new Filesystem;
         $fs->removeDirectory($this->testPath);
-        $this->driver = null;
-        $this->perforce = null;
-        $this->httpDownloader = null;
-        $this->process = null;
-        $this->io = null;
-        $this->repoConfig = null;
-        $this->config = null;
-        $this->testPath = null;
     }
 
+    /**
+     * @return void
+     */
     protected function overrideDriverInternalPerforce(Perforce $perforce)
     {
         $reflectionClass = new \ReflectionClass($this->driver);
@@ -72,6 +96,11 @@ class PerforceDriverTest extends TestCase
         $property->setValue($this->driver, $perforce);
     }
 
+    /**
+     * @param string $testPath
+     *
+     * @return Config
+     */
     protected function getTestConfig($testPath)
     {
         $config = new Config();
@@ -80,30 +109,25 @@ class PerforceDriverTest extends TestCase
         return $config;
     }
 
-    protected function getTestRepoConfig()
-    {
-        return array(
-            'url' => self::TEST_URL,
-            'depot' => self::TEST_DEPOT,
-            'branch' => self::TEST_BRANCH,
-        );
-    }
-
+    /**
+     * @return \PHPUnit\Framework\MockObject\MockObject&\Composer\IO\IOInterface
+     */
     protected function getMockIOInterface()
     {
         return $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
     }
 
-    protected function getMockProcessExecutor()
-    {
-        return $this->getMockBuilder('Composer\Util\ProcessExecutor')->getMock();
-    }
-
+    /**
+     * @return \PHPUnit\Framework\MockObject\MockObject&\Composer\Util\HttpDownloader
+     */
     protected function getMockHttpDownloader()
     {
         return $this->getMockBuilder('Composer\Util\HttpDownloader')->disableOriginalConstructor()->getMock();
     }
 
+    /**
+     * @return \PHPUnit\Framework\MockObject\MockObject&\Composer\Util\Perforce
+     */
     protected function getMockPerforce()
     {
         $methods = array('p4login', 'checkStream', 'writeP4ClientSpec', 'connectClient', 'getComposerInformation', 'cleanupClientSpec');

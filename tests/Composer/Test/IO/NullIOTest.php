@@ -42,7 +42,7 @@ class NullIOTest extends TestCase
     {
         $io = new NullIO();
 
-        $this->assertTrue(is_array($io->getAuthentications()));
+        $this->assertTrue(is_array($io->getAuthentications())); // @phpstan-ignore-line
         $this->assertEmpty($io->getAuthentications());
         $this->assertEquals(array('username' => null, 'password' => null), $io->getAuthentication('foo'));
     }
@@ -58,14 +58,16 @@ class NullIOTest extends TestCase
     {
         $io = new NullIO();
 
-        $this->assertEquals('foo', $io->askConfirmation('bar', 'foo'));
+        $this->assertEquals(false, $io->askConfirmation('bar', false));
     }
 
     public function testAskAndValidate()
     {
         $io = new NullIO();
 
-        $this->assertEquals('foo', $io->askAndValidate('question', 'validator', false, 'foo'));
+        $this->assertEquals('foo', $io->askAndValidate('question', function ($x) {
+            return true;
+        }, null, 'foo'));
     }
 
     public function testSelect()

@@ -12,6 +12,7 @@
 
 namespace Composer\Test;
 
+use Composer\Pcre\Preg;
 use Composer\Util\Filesystem;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Process\Process;
@@ -21,10 +22,13 @@ use Symfony\Component\Process\Process;
  */
 class AllFunctionalTest extends TestCase
 {
+    /** @var string|false */
     protected $oldcwd;
-    protected $oldenv;
-    protected $oldenvCache;
+    /** @var ?string */
     protected $testDir;
+    /**
+     * @var string
+     */
     private static $pharPath;
 
     public function setUp()
@@ -36,7 +40,9 @@ class AllFunctionalTest extends TestCase
 
     public function tearDown()
     {
-        chdir($this->oldcwd);
+        if ($this->oldcwd) {
+            chdir($this->oldcwd);
+        }
 
         if ($this->testDir) {
             $fs = new Filesystem;
@@ -78,7 +84,13 @@ class AllFunctionalTest extends TestCase
             }
         }
 
-        $proc = new Process((defined('PHP_BINARY') ? escapeshellcmd(PHP_BINARY) : 'php').' -dphar.readonly=0 '.escapeshellarg('./bin/compile'), $target);
+        // TODO in v2.3 always call with an array
+        if (method_exists('Symfony\Component\Process\Process', 'fromShellCommandline')) {
+            $proc = new Process(array((defined('PHP_BINARY') ? PHP_BINARY : 'php'), '-dphar.readonly=0', './bin/compile'), $target);
+        } else {
+            // @phpstan-ignore-next-line
+            $proc = new Process((defined('PHP_BINARY') ? escapeshellcmd(PHP_BINARY) : 'php').' -dphar.readonly=0 '.escapeshellarg('./bin/compile'), $target);
+        }
         $exitcode = $proc->run();
 
         if ($exitcode !== 0 || trim($proc->getOutput())) {
@@ -91,6 +103,7 @@ class AllFunctionalTest extends TestCase
     /**
      * @dataProvider getTestFiles
      * @depends testBuildPhar
+     * @param string $testFile
      */
     public function testIntegration($testFile)
     {
@@ -110,8 +123,15 @@ class AllFunctionalTest extends TestCase
             'COMPOSER_CACHE_DIR' => $this->testDir.'cache',
         );
 
-        $cmd = (defined('PHP_BINARY') ? escapeshellcmd(PHP_BINARY) : 'php') .' '.escapeshellarg(self::$pharPath).' --no-ansi '.$testData['RUN'];
-        $proc = new Process($cmd, $this->testDir, $env, null, 300);
+        // TODO in v2.3 always call with an array
+        if (method_exists('Symfony\Component\Process\Process', 'fromShellCommandline')) {
+            $cmd = array((defined('PHP_BINARY') ? PHP_BINARY : 'php'), self::$pharPath, '--no-ansi', $testData['RUN']);
+            $proc = new Process($cmd, $this->testDir, $env, null, 300);
+        } else {
+            $cmd = (defined('PHP_BINARY') ? escapeshellcmd(PHP_BINARY) : 'php') .' '.escapeshellarg(self::$pharPath).' --no-ansi '.$testData['RUN'];
+            // @phpstan-ignore-next-line
+            $proc = new Process($cmd, $this->testDir, $env, null, 300);
+        }
         $output = '';
 
         $exitcode = $proc->run(function ($type, $buffer) use (&$output) {
@@ -128,10 +148,10 @@ class AllFunctionalTest extends TestCase
                     $line++;
                 }
                 if ($expected[$i] === '%') {
-                    preg_match('{%(.+?)%}', substr($expected, $i), $match);
+                    Preg::isMatch('{%(.+?)%}', substr($expected, $i), $match);
                     $regex = $match[1];
 
-                    if (preg_match('{'.$regex.'}', substr($output, $j), $match)) {
+                    if (Preg::isMatch('{'.$regex.'}', substr($output, $j), $match)) {
                         $i += strlen($regex) + 2;
                         $j += strlen($match[0]);
                         continue;
@@ -169,6 +189,9 @@ class AllFunctionalTest extends TestCase
         }
     }
 
+    /**
+     * @return array<string, array<string>>
+     */
     public function getTestFiles()
     {
         $tests = array();
@@ -179,9 +202,13 @@ class AllFunctionalTest extends TestCase
         return $tests;
     }
 
+    /**
+     * @param string $file
+     * @return array<string, int|string>
+     */
     private function parseTestFile($file)
     {
-        $tokens = preg_split('#(?:^|\n*)--([A-Z-]+)--\n#', file_get_contents($file), null, PREG_SPLIT_DELIM_CAPTURE);
+        $tokens = Preg::split('#(?:^|\n*)--([A-Z-]+)--\n#', file_get_contents($file), -1, PREG_SPLIT_DELIM_CAPTURE);
         $data = array();
         $section = null;
 
@@ -237,6 +264,10 @@ class AllFunctionalTest extends TestCase
         return $data;
     }
 
+    /**
+     * @param string $output
+     * @return string
+     */
     private function cleanOutput($output)
     {
         $processed = '';

@@ -16,6 +16,7 @@ use Composer\Composer;
 use Composer\Factory;
 use Composer\Config;
 use Composer\Downloader\TransportException;
+use Composer\Pcre\Preg;
 use Composer\Repository\PlatformRepository;
 use Composer\Plugin\CommandEvent;
 use Composer\Plugin\PluginEvents;
@@ -24,6 +25,7 @@ use Composer\Util\IniHelper;
 use Composer\Util\ProcessExecutor;
 use Composer\Util\HttpDownloader;
 use Composer\Util\StreamContextFactory;
+use Composer\Util\Platform;
 use Composer\SelfUpdate\Keys;
 use Composer\SelfUpdate\Versions;
 use Composer\IO\NullIO;
@@ -47,6 +49,9 @@ class DiagnoseCommand extends BaseCommand
     /** @var int */
     protected $exitCode = 0;
 
+    /**
+     * @return void
+     */
     protected function configure()
     {
         $this
@@ -65,7 +70,7 @@ EOT
     }
 
     /**
-     * {@inheritdoc}
+     * @return int
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
@@ -86,7 +91,7 @@ EOT
             $config = Factory::createConfig();
         }
 
-        $config->merge(array('config' => array('secure-http' => false)));
+        $config->merge(array('config' => array('secure-http' => false)), Config::SOURCE_COMMAND);
         $config->prohibitUrlByConfig('http://repo.packagist.org', new NullIO);
 
         $this->httpDownloader = Factory::createHttpDownloader($io, $config);
@@ -176,14 +181,27 @@ EOT
 
         $finder = new ExecutableFinder;
         $hasSystemUnzip = (bool) $finder->find('unzip');
+        $bin7zip = '';
+        if ($hasSystem7zip = (bool) $finder->find('7z', null, array('C:\Program Files\7-Zip'))) {
+            $bin7zip = '7z';
+        }
+        if (!Platform::isWindows() && !$hasSystem7zip && $hasSystem7zip = (bool) $finder->find('7zz')) {
+            $bin7zip = '7zz';
+        }
+
         $io->write(
             'zip: ' . (extension_loaded('zip') ? '<comment>extension present</comment>' : '<comment>extension not loaded</comment>')
             . ', ' . ($hasSystemUnzip ? '<comment>unzip present</comment>' : '<comment>unzip not available</comment>')
+            . ', ' . ($hasSystem7zip ? '<comment>7-Zip present ('.$bin7zip.')</comment>' : '<comment>7-Zip not available</comment>')
+            . (($hasSystem7zip || $hasSystemUnzip) && !function_exists('proc_open') ? ', <warning>proc_open is disabled or not present, unzip/7-z will not be usable</warning>' : '')
         );
 
         return $this->exitCode;
     }
 
+    /**
+     * @return string|true
+     */
     private function checkComposerSchema()
     {
         $validator = new ConfigValidator($this->getIO());
@@ -208,8 +226,15 @@ EOT
         return true;
     }
 
+    /**
+     * @return string|true
+     */
     private function checkGit()
     {
+        if (!function_exists('proc_open')) {
+            return '<comment>proc_open is not available, git cannot be used</comment>';
+        }
+
         $this->process->execute('git config color.ui', $output);
         if (strtolower(trim($output)) === 'always') {
             return '<comment>Your git color.ui setting is set to always, this is known to create issues. Use "git config --global color.ui true" to set it correctly.</comment>';
@@ -218,6 +243,11 @@ EOT
         return true;
     }
 
+    /**
+     * @param string $proto
+     *
+     * @return string|string[]|true
+     */
     private function checkHttp($proto, Config $config)
     {
         $result = $this->checkConnectivity();
@@ -253,6 +283,9 @@ EOT
         return true;
     }
 
+    /**
+     * @return string|true|\Exception
+     */
     private function checkHttpProxy()
     {
         $result = $this->checkConnectivity();
@@ -278,6 +311,12 @@ EOT
         return true;
     }
 
+    /**
+     * @param string $domain
+     * @param string $token
+     *
+     * @return string|true|\Exception
+     */
     private function checkGithubOauth($domain, $token)
     {
         $result = $this->checkConnectivity();
@@ -289,9 +328,11 @@ EOT
         try {
             $url = $domain === 'github.com' ? 'https://api.'.$domain.'/' : 'https://'.$domain.'/api/v3/';
 
-            return $this->httpDownloader->get($url, array(
+            $this->httpDownloader->get($url, array(
                 'retry-auth-failure' => false,
-            )) ? true : 'Unexpected error';
+            ));
+
+            return true;
         } catch (\Exception $e) {
             if ($e instanceof TransportException && $e->getCode() === 401) {
                 return '<comment>The oauth token for '.$domain.' seems invalid, run "composer config --global --unset github-oauth.'.$domain.'" to remove it</comment>';
@@ -305,7 +346,7 @@ EOT
      * @param  string             $domain
      * @param  string             $token
      * @throws TransportException
-     * @return array|string
+     * @return mixed|string
      */
     private function getGithubRateLimit($domain, $token = null)
     {
@@ -324,7 +365,10 @@ EOT
         return $data['resources']['core'];
     }
 
-    private function checkDiskSpace($config)
+    /**
+     * @return string|true
+     */
+    private function checkDiskSpace(Config $config)
     {
         $minSpaceFree = 1024 * 1024;
         if ((($df = @disk_free_space($dir = $config->get('home'))) !== false && $df < $minSpaceFree)
@@ -336,7 +380,10 @@ EOT
         return true;
     }
 
-    private function checkPubKeys($config)
+    /**
+     * @return string[]|true
+     */
+    private function checkPubKeys(Config $config)
     {
         $home = $config->get('home');
         $errors = array();
@@ -365,7 +412,10 @@ EOT
         return $errors ?: true;
     }
 
-    private function checkVersion($config)
+    /**
+     * @return string|\Exception|true
+     */
+    private function checkVersion(Config $config)
     {
         $result = $this->checkConnectivity();
         if ($result !== true) {
@@ -386,6 +436,9 @@ EOT
         return true;
     }
 
+    /**
+     * @return string
+     */
     private function getCurlVersion()
     {
         if (extension_loaded('curl')) {
@@ -396,7 +449,7 @@ EOT
             $version = curl_version();
 
             return '<comment>'.$version['version'].'</comment> '.
-                'libz <comment>'.(isset($version['libz_version']) ? $version['libz_version'] : 'missing').'</comment> '.
+                'libz <comment>'.(!empty($version['libz_version']) ? $version['libz_version'] : 'missing').'</comment> '.
                 'ssl <comment>'.(isset($version['ssl_version']) ? $version['ssl_version'] : 'missing').'</comment>';
         }
 
@@ -404,7 +457,9 @@ EOT
     }
 
     /**
-     * @param bool|string|\Exception $result
+     * @param bool|string|string[]|\Exception $result
+     *
+     * @return void
      */
     private function outputResult($result)
     {
@@ -452,6 +507,9 @@ EOT
         }
     }
 
+    /**
+     * @return string|true
+     */
     private function checkPlatform()
     {
         $output = '';
@@ -522,7 +580,7 @@ EOT
         ob_start();
         phpinfo(INFO_GENERAL);
         $phpinfo = ob_get_clean();
-        if (preg_match('{Configure Command(?: *</td><td class="v">| *=> *)(.*?)(?:</td>|$)}m', $phpinfo, $match)) {
+        if (Preg::isMatch('{Configure Command(?: *</td><td class="v">| *=> *)(.*?)(?:</td>|$)}m', $phpinfo, $match)) {
             $configure = $match[1];
 
             if (false !== strpos($configure, '--enable-sigchild')) {
@@ -536,6 +594,8 @@ EOT
 
         if (filter_var(ini_get('xdebug.profiler_enabled'), FILTER_VALIDATE_BOOLEAN)) {
             $warnings['xdebug_profile'] = true;
+        } elseif (XdebugHandler::isXdebugActive()) {
+            $warnings['xdebug_loaded'] = true;
         }
         // elseif (XdebugHandler::isXdebugActive()) {
         //     $warnings['xdebug_loaded'] = true;
@@ -683,7 +743,7 @@ EOT
     /**
      * Check if allow_url_fopen is ON
      *
-     * @return true|string
+     * @return string|true
      */
     private function checkConnectivity()
     {

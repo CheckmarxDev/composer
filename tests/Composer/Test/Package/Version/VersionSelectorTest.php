@@ -12,6 +12,7 @@
 
 namespace Composer\Test\Package\Version;
 
+use Composer\Filter\PlatformRequirementFilter\PlatformRequirementFilterFactory;
 use Composer\Package\Version\VersionSelector;
 use Composer\Package\Package;
 use Composer\Package\Link;
@@ -70,7 +71,7 @@ class VersionSelectorTest extends TestCase
 
         $best = $versionSelector->findBestCandidate($packageName);
         $this->assertSame($package1, $best, 'Latest version supporting php 5.5 should be returned (1.0.0)');
-        $best = $versionSelector->findBestCandidate($packageName, null, 'stable', true);
+        $best = $versionSelector->findBestCandidate($packageName, null, 'stable', PlatformRequirementFilterFactory::ignoreAll());
         $this->assertSame($package2, $best, 'Latest version should be returned when ignoring platform reqs (2.0.0)');
     }
 
@@ -96,7 +97,32 @@ class VersionSelectorTest extends TestCase
 
         $best = $versionSelector->findBestCandidate($packageName);
         $this->assertSame($package1, $best, 'Latest version supporting ext-zip 5.3.0 should be returned (1.0.0)');
-        $best = $versionSelector->findBestCandidate($packageName, null, 'stable', true);
+        $best = $versionSelector->findBestCandidate($packageName, null, 'stable', PlatformRequirementFilterFactory::ignoreAll());
+        $this->assertSame($package2, $best, 'Latest version should be returned when ignoring platform reqs (2.0.0)');
+    }
+
+    public function testLatestVersionIsReturnedThatMatchesPlatformExt()
+    {
+        $packageName = 'foobar';
+
+        $platform = new PlatformRepository();
+        $repositorySet = $this->createMockRepositorySet();
+        $versionSelector = new VersionSelector($repositorySet, $platform);
+
+        $parser = new VersionParser;
+        $package1 = $this->createPackage('1.0.0');
+        $package2 = $this->createPackage('2.0.0');
+        $package2->setRequires(array('ext-barfoo' => new Link($packageName, 'ext-barfoo', $parser->parseConstraints('*'), Link::TYPE_REQUIRE, '*')));
+        $packages = array($package1, $package2);
+
+        $repositorySet->expects($this->any())
+            ->method('findPackages')
+            ->with($packageName, null)
+            ->will($this->returnValue($packages));
+
+        $best = $versionSelector->findBestCandidate($packageName);
+        $this->assertSame($package1, $best, 'Latest version not requiring ext-barfoo should be returned (1.0.0)');
+        $best = $versionSelector->findBestCandidate($packageName, null, 'stable', PlatformRequirementFilterFactory::ignoreAll());
         $this->assertSame($package2, $best, 'Latest version should be returned when ignoring platform reqs (2.0.0)');
     }
 
@@ -122,7 +148,7 @@ class VersionSelectorTest extends TestCase
 
         $best = $versionSelector->findBestCandidate($packageName);
         $this->assertSame($package1, $best, 'Latest version supporting composer 1 should be returned (1.0.0)');
-        $best = $versionSelector->findBestCandidate($packageName, null, 'stable', true);
+        $best = $versionSelector->findBestCandidate($packageName, null, 'stable', PlatformRequirementFilterFactory::ignoreAll());
         $this->assertSame($package2, $best, 'Latest version should be returned when ignoring platform reqs (1.1.0)');
     }
 
@@ -268,40 +294,24 @@ class VersionSelectorTest extends TestCase
     }
 
     /**
-     * @dataProvider getRecommendedRequireVersionPackages
+     * @dataProvider provideRecommendedRequireVersionPackages
+     *
+     * @param string      $prettyVersion
+     * @param string      $expectedVersion
+     * @param string|null $branchAlias
+     * @param string      $packageName
      */
-    public function testFindRecommendedRequireVersion($prettyVersion, $isDev, $stability, $expectedVersion, $branchAlias = null)
+    public function testFindRecommendedRequireVersion($prettyVersion, $expectedVersion, $branchAlias = null, $packageName = 'foo/bar')
     {
         $repositorySet = $this->createMockRepositorySet();
         $versionSelector = new VersionSelector($repositorySet);
         $versionParser = new VersionParser();
 
-        $package = $this->getMockBuilder('\Composer\Package\PackageInterface')->getMock();
-        $package
-            ->expects($this->any())
-            ->method('getPrettyVersion')
-            ->will($this->returnValue($prettyVersion));
-        $package
-            ->expects($this->any())
-            ->method('getVersion')
-            ->will($this->returnValue($versionParser->normalize($prettyVersion)));
-        $package
-            ->expects($this->any())
-            ->method('isDev')
-            ->will($this->returnValue($isDev));
-        $package
-            ->expects($this->any())
-            ->method('getStability')
-            ->will($this->returnValue($stability));
-        $package
-            ->expects($this->any())
-            ->method('getTransportOptions')
-            ->will($this->returnValue(array()));
+        $package = new Package($packageName, $versionParser->normalize($prettyVersion), $prettyVersion);
 
-        $branchAlias = $branchAlias === null ? array() : array('branch-alias' => array($prettyVersion => $branchAlias));
-        $package->expects($this->any())
-            ->method('getExtra')
-            ->will($this->returnValue($branchAlias));
+        if ($branchAlias) {
+            $package->setExtra(array('branch-alias' => array($prettyVersion => $branchAlias)));
+        }
 
         $recommended = $versionSelector->findRecommendedRequireVersion($package);
 
@@ -309,42 +319,51 @@ class VersionSelectorTest extends TestCase
         $this->assertSame($expectedVersion, $recommended);
     }
 
-    public function getRecommendedRequireVersionPackages()
+    public function provideRecommendedRequireVersionPackages()
     {
         return array(
-            // real version, is dev package, stability, expected recommendation, [branch-alias]
-            array('1.2.1', false, 'stable', '^1.2'),
-            array('1.2', false, 'stable', '^1.2'),
-            array('v1.2.1', false, 'stable', '^1.2'),
-            array('3.1.2-pl2', false, 'stable', '^3.1'),
-            array('3.1.2-patch', false, 'stable', '^3.1'),
-            array('2.0-beta.1', false, 'beta', '^2.0@beta'),
-            array('3.1.2-alpha5', false, 'alpha', '^3.1@alpha'),
-            array('3.0-RC2', false, 'RC', '^3.0@RC'),
-            array('0.1.0', false, 'stable', '^0.1.0'),
-            array('0.1.3', false, 'stable', '^0.1.3'),
-            array('0.0.3', false, 'stable', '^0.0.3'),
-            array('0.0.3-alpha', false, 'alpha', '^0.0.3@alpha'),
+            // real version, expected recommendation, [branch-alias], [pkg name]
+            array('1.2.1', '^1.2'),
+            array('1.2', '^1.2'),
+            array('v1.2.1', '^1.2'),
+            array('3.1.2-pl2', '^3.1'),
+            array('3.1.2-patch', '^3.1'),
+            array('2.0-beta.1', '^2.0@beta'),
+            array('3.1.2-alpha5', '^3.1@alpha'),
+            array('3.0-RC2', '^3.0@RC'),
+            array('0.1.0', '^0.1.0'),
+            array('0.1.3', '^0.1.3'),
+            array('0.0.3', '^0.0.3'),
+            array('0.0.3-alpha', '^0.0.3@alpha'),
             // date-based versions are not touched at all
-            array('v20121020', false, 'stable', 'v20121020'),
-            array('v20121020.2', false, 'stable', 'v20121020.2'),
+            array('v20121020', 'v20121020'),
+            array('v20121020.2', 'v20121020.2'),
             // dev packages without alias are not touched at all
-            array('dev-master', true, 'dev', 'dev-master'),
-            array('3.1.2-dev', true, 'dev', '3.1.2-dev'),
+            array('dev-master', 'dev-master'),
+            array('3.1.2-dev', '3.1.2-dev'),
             // dev packages with alias inherit the alias
-            array('dev-master', true, 'dev', '^2.1@dev', '2.1.x-dev'),
-            array('dev-master', true, 'dev', '^2.1@dev', '2.1-dev'),
-            array('dev-master', true, 'dev', '^2.1@dev', '2.1.3.x-dev'),
-            array('dev-master', true, 'dev', '^2.0@dev', '2.x-dev'),
-            array('dev-master', true, 'dev', '^0.3.0@dev', '0.3.x-dev'),
-            array('dev-master', true, 'dev', '^0.0.3@dev', '0.0.3.x-dev'),
-            array('dev-master', true, 'dev', 'dev-master', VersionParser::DEFAULT_BRANCH_ALIAS),
+            array('dev-master', '^2.1@dev', '2.1.x-dev'),
+            array('dev-master', '^2.1@dev', '2.1-dev'),
+            array('dev-master', '^2.1@dev', '2.1.3.x-dev'),
+            array('dev-master', '^2.0@dev', '2.x-dev'),
+            array('dev-master', '^0.3.0@dev', '0.3.x-dev'),
+            array('dev-master', '^0.0.3@dev', '0.0.3.x-dev'),
+            array('dev-master', 'dev-master', VersionParser::DEFAULT_BRANCH_ALIAS),
             // numeric alias
-            array('3.x-dev', true, 'dev', '^3.0@dev', '3.0.x-dev'),
-            array('3.x-dev', true, 'dev', '^3.0@dev', '3.0-dev'),
+            array('3.x-dev', '^3.0@dev', '3.0.x-dev'),
+            array('3.x-dev', '^3.0@dev', '3.0-dev'),
+            // ext in sync with php
+            array(PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION . '.' . PHP_RELEASE_VERSION,  '*', null, 'ext-filter'),
+            // ext versioned individually
+            array('3.0.5', '^3.0', null, 'ext-xdebug'),
         );
     }
 
+    /**
+     * @param string $version
+     *
+     * @return Package
+     */
     private function createPackage($version)
     {
         $parser = new VersionParser();
@@ -352,6 +371,9 @@ class VersionSelectorTest extends TestCase
         return new Package('foo', $parser->normalize($version), $version);
     }
 
+    /**
+     * @return \PHPUnit\Framework\MockObject\MockObject&\Composer\Repository\RepositorySet
+     */
     private function createMockRepositorySet()
     {
         return $this->getMockBuilder('Composer\Repository\RepositorySet')

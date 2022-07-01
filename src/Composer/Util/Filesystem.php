@@ -12,6 +12,7 @@
 
 namespace Composer\Util;
 
+use Composer\Pcre\Preg;
 use React\Promise\PromiseInterface;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -24,7 +25,7 @@ use Symfony\Component\Finder\Finder;
  */
 class Filesystem
 {
-    /** @var ProcessExecutor */
+    /** @var ?ProcessExecutor */
     private $processExecutor;
 
     public function __construct(ProcessExecutor $executor = null)
@@ -32,6 +33,11 @@ class Filesystem
         $this->processExecutor = $executor;
     }
 
+    /**
+     * @param string $file
+     *
+     * @return bool
+     */
     public function remove($file)
     {
         if (is_dir($file)) {
@@ -62,6 +68,12 @@ class Filesystem
         return \count($finder) === 0;
     }
 
+    /**
+     * @param string $dir
+     * @param bool   $ensureDirectoryExists
+     *
+     * @return void
+     */
     public function emptyDirectory($dir, $ensureDirectoryExists = true)
     {
         if (is_link($dir) && file_exists($dir)) {
@@ -163,10 +175,11 @@ class Filesystem
 
     /**
      * @param string $directory
+     * @param bool   $fallbackToPhp
      *
-     * @return bool|null Returns null, when no edge case was hit. Otherwise a bool whether removal was successfull
+     * @return bool|null Returns null, when no edge case was hit. Otherwise a bool whether removal was successful
      */
-    private function removeEdgeCases($directory)
+    private function removeEdgeCases($directory, $fallbackToPhp = true)
     {
         if ($this->isSymlinkedDirectory($directory)) {
             return $this->unlinkSymlinkedDirectory($directory);
@@ -184,11 +197,11 @@ class Filesystem
             return true;
         }
 
-        if (preg_match('{^(?:[a-z]:)?[/\\\\]+$}i', $directory)) {
+        if (Preg::isMatch('{^(?:[a-z]:)?[/\\\\]+$}i', $directory)) {
             throw new \RuntimeException('Aborting an attempted deletion of '.$directory.', this was probably not intended, if it is a real use case please report it.');
         }
 
-        if (!\function_exists('proc_open')) {
+        if (!\function_exists('proc_open') && $fallbackToPhp) {
             return $this->removeDirectoryPhp($directory);
         }
 
@@ -207,6 +220,11 @@ class Filesystem
      */
     public function removeDirectoryPhp($directory)
     {
+        $edgeCaseResult = $this->removeEdgeCases($directory, false);
+        if ($edgeCaseResult !== null) {
+            return $edgeCaseResult;
+        }
+
         try {
             $it = new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS);
         } catch (\UnexpectedValueException $e) {
@@ -229,9 +247,17 @@ class Filesystem
             }
         }
 
+        // release locks on the directory, see https://github.com/composer/composer/issues/9945
+        unset($ri, $it, $file);
+
         return $this->rmdir($directory);
     }
 
+    /**
+     * @param string $directory
+     *
+     * @return void
+     */
     public function ensureDirectoryExists($directory)
     {
         if (!is_dir($directory)) {
@@ -322,6 +348,8 @@ class Filesystem
      *
      * @param string $source
      * @param string $target
+     *
+     * @return void
      */
     public function copyThenRemove($source, $target)
     {
@@ -366,6 +394,12 @@ class Filesystem
         return $result;
     }
 
+    /**
+     * @param string $source
+     * @param string $target
+     *
+     * @return void
+     */
     public function rename($source, $target)
     {
         if (true === @rename($source, $target)) {
@@ -435,7 +469,7 @@ class Filesystem
         }
 
         $commonPath = $to;
-        while (strpos($from.'/', $commonPath.'/') !== 0 && '/' !== $commonPath && !preg_match('{^[a-z]:/?$}i', $commonPath)) {
+        while (strpos($from.'/', $commonPath.'/') !== 0 && '/' !== $commonPath && !Preg::isMatch('{^[a-z]:/?$}i', $commonPath)) {
             $commonPath = strtr(\dirname($commonPath), '\\', '/');
         }
 
@@ -474,7 +508,7 @@ class Filesystem
         }
 
         $commonPath = $to;
-        while (strpos($from.'/', $commonPath.'/') !== 0 && '/' !== $commonPath && !preg_match('{^[a-z]:/?$}i', $commonPath) && '.' !== $commonPath) {
+        while (strpos($from.'/', $commonPath.'/') !== 0 && '/' !== $commonPath && !Preg::isMatch('{^[a-z]:/?$}i', $commonPath) && '.' !== $commonPath) {
             $commonPath = strtr(\dirname($commonPath), '\\', '/');
         }
 
@@ -510,7 +544,7 @@ class Filesystem
 
     /**
      * Returns size of a file or directory specified by path. If a directory is
-     * given, it's size will be computed recursively.
+     * given, its size will be computed recursively.
      *
      * @param  string            $path Path to the file or directory
      * @throws \RuntimeException
@@ -540,22 +574,28 @@ class Filesystem
         $parts = array();
         $path = strtr($path, '\\', '/');
         $prefix = '';
-        $absolute = false;
+        $absolute = '';
+
+        // extract windows UNC paths e.g. \\foo\bar
+        if (strpos($path, '//') === 0 && \strlen($path) > 2) {
+            $absolute = '//';
+            $path = substr($path, 2);
+        }
 
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
-        if (preg_match('{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix', $path, $match)) {
+        if (Preg::isMatch('{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix', $path, $match)) {
             $prefix = $match[1];
             $path = substr($path, \strlen($prefix));
         }
 
         if (strpos($path, '/') === 0) {
-            $absolute = true;
+            $absolute = '/';
             $path = substr($path, 1);
         }
 
         $up = false;
         foreach (explode('/', $path) as $chunk) {
-            if ('..' === $chunk && ($absolute || $up)) {
+            if ('..' === $chunk && ($absolute !== '' || $up)) {
                 array_pop($parts);
                 $up = !(empty($parts) || '..' === end($parts));
             } elseif ('.' !== $chunk && '' !== $chunk) {
@@ -564,7 +604,7 @@ class Filesystem
             }
         }
 
-        return $prefix.($absolute ? '/' : '').implode('/', $parts);
+        return $prefix.((string) $absolute).implode('/', $parts);
     }
 
     /**
@@ -577,7 +617,7 @@ class Filesystem
      */
     public static function trimTrailingSlash($path)
     {
-        if (!preg_match('{^[/\\\\]+$}', $path)) {
+        if (!Preg::isMatch('{^[/\\\\]+$}', $path)) {
             $path = rtrim($path, '/\\');
         }
 
@@ -592,16 +632,21 @@ class Filesystem
      */
     public static function isLocalPath($path)
     {
-        return (bool) preg_match('{^(file://(?!//)|/(?!/)|/?[a-z]:[\\\\/]|\.\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i', $path);
+        return Preg::isMatch('{^(file://(?!//)|/(?!/)|/?[a-z]:[\\\\/]|\.\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i', $path);
     }
 
+    /**
+     * @param string $path
+     *
+     * @return string
+     */
     public static function getPlatformPath($path)
     {
         if (Platform::isWindows()) {
-            $path = preg_replace('{^(?:file:///([a-z]):?/)}i', 'file://$1:/', $path);
+            $path = Preg::replace('{^(?:file:///([a-z]):?/)}i', 'file://$1:/', $path);
         }
 
-        return preg_replace('{^file://}i', '', $path);
+        return (string) Preg::replace('{^file://}i', '', $path);
     }
 
     /**
@@ -610,7 +655,7 @@ class Filesystem
      * This will also check for readability by reading the file as is_readable can not be trusted on network-mounts
      * and \\wsl$ paths. See https://github.com/composer/composer/issues/8231 and https://bugs.php.net/bug.php?id=68926
      *
-     * @param string $path
+     * @param  string $path
      * @return bool
      */
     public static function isReadable($path)
@@ -631,6 +676,11 @@ class Filesystem
         return false;
     }
 
+    /**
+     * @param string $directory
+     *
+     * @return int
+     */
     protected function directorySize($directory)
     {
         $it = new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS);
@@ -757,6 +807,8 @@ class Filesystem
      *
      * @param string $target
      * @param string $junction
+     *
+     * @return void
      */
     public function junction($target, $junction)
     {
@@ -835,6 +887,12 @@ class Filesystem
         return $this->rmdir($junction);
     }
 
+    /**
+     * @param string $path
+     * @param string $content
+     *
+     * @return int|false
+     */
     public function filePutContentsIfModified($path, $content)
     {
         $currentContent = @file_get_contents($path);
@@ -850,6 +908,8 @@ class Filesystem
      *
      * @param string $source
      * @param string $target
+     *
+     * @return void
      */
     public function safeCopy($source, $target)
     {
@@ -866,6 +926,11 @@ class Filesystem
     /**
      * compare 2 files
      * https://stackoverflow.com/questions/3060125/can-i-use-file-get-contents-to-compare-two-files
+     *
+     * @param string $a
+     * @param string $b
+     *
+     * @return bool
      */
     private function filesAreEqual($a, $b)
     {

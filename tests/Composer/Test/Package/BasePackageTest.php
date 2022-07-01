@@ -44,14 +44,17 @@ class BasePackageTest extends TestCase
     }
 
     /**
-     * @dataProvider formattedVersions
+     * @dataProvider provideFormattedVersions
+     *
+     * @param bool   $truncate
+     * @param string $expected
      */
     public function testFormatVersionForDevPackage(BasePackage $package, $truncate, $expected)
     {
         $this->assertSame($expected, $package->getFullPrettyVersion($truncate));
     }
 
-    public function formattedVersions()
+    public function provideFormattedVersions()
     {
         $data = array(
             array(
@@ -88,5 +91,34 @@ class BasePackageTest extends TestCase
         };
 
         return array_map($createPackage, $data);
+    }
+
+    /**
+     * @param string[] $packageNames
+     * @param non-empty-string $wrap
+     * @param string $expectedRegexp
+     *
+     * @dataProvider dataPackageNamesToRegexp
+     */
+    public function testPackageNamesToRegexp(array $packageNames, $wrap, $expectedRegexp)
+    {
+        $regexp = BasePackage::packageNamesToRegexp($packageNames, $wrap);
+
+        $this->assertSame($expectedRegexp, $regexp);
+    }
+
+    /**
+     * @return mixed[][]
+     */
+    public function dataPackageNamesToRegexp()
+    {
+        return array(
+            array(
+                array('ext-*', 'monolog/monolog'), '{^%s$}i', '{^ext\-.*|monolog/monolog$}i',
+                array('php'), '{^%s$}i', '{^php$}i',
+                array('*'), '{^%s$}i', '{^.*$}i',
+                array('foo', 'bar'), '§%s§', '§foo|bar§',
+            )
+        );
     }
 }

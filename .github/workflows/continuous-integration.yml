@@ -11,8 +11,6 @@ on:
 env:
   COMPOSER_FLAGS: "--ansi --no-interaction --no-progress --prefer-dist"
   COMPOSER_UPDATE_FLAGS: ""
-  COMPOSER_TESTS_ARE_RUNNING: "1"
-  SYMFONY_PHPUNIT_REMOVE_RETURN_TYPEHINT: "1"
 
 jobs:
   tests:
@@ -34,6 +32,7 @@ jobs:
           - "7.3"
           - "7.4"
           - "8.0"
+          - "8.1"
         dependencies: [locked]
         os: [ubuntu-latest]
         experimental: [false]
@@ -47,10 +46,6 @@ jobs:
             os: ubuntu-latest
             experimental: false
           - php-version: "8.0"
-            dependencies: highest
-            os: ubuntu-latest
-            experimental: false
-          - php-version: "8.0"
             os: windows-latest
             dependencies: locked
             experimental: false
@@ -59,24 +54,24 @@ jobs:
             dependencies: locked
             experimental: false
           - php-version: "8.1"
-            dependencies: lowest-ignore
+            dependencies: lowest
             os: ubuntu-latest
-            experimental: true
+            experimental: false
           - php-version: "8.1"
-            dependencies: highest-ignore
+            dependencies: highest
             os: ubuntu-latest
-            experimental: true
+            experimental: false
 
     steps:
       - name: "Checkout"
-        uses: "actions/checkout@v2"
+        uses: "actions/checkout@v3"
 
       - name: "Install PHP"
         uses: "shivammathur/setup-php@v2"
         with:
           coverage: "none"
           extensions: "intl, zip"
-          ini-values: "memory_limit=-1, phar.readonly=0"
+          ini-values: "memory_limit=-1, phar.readonly=0, error_reporting=E_ALL, display_errors=On"
           php-version: "${{ matrix.php-version }}"
           tools: composer
 
@@ -89,7 +84,12 @@ jobs:
         run: "echo \"COMPOSER_FLAGS=$COMPOSER_FLAGS --ignore-platform-req=php\" >> $GITHUB_ENV"
 
       - name: "Remove platform config to get latest dependencies for current PHP version when build is not locked"
+        if: "contains(matrix.dependencies, 'highest') || contains(matrix.dependencies, 'lowest')"
         run: "composer config platform --unset"
+
+      - name: "Allow alpha releases for latest-deps builds to catch problems earlier"
+        if: "contains(matrix.dependencies, 'highest')"
+        run: "composer config minimum-stability alpha"
 
       - name: "Update dependencies from composer.json using composer binary provided by system"
         if: "contains(matrix.dependencies, 'highest') || contains(matrix.dependencies, 'lowest')"
@@ -104,14 +104,21 @@ jobs:
         # using ~ here to avoid issues with windows CLI removing the ^
         run: 'composer require --no-update --dev "symfony/phpunit-bridge:~5.2"'
 
+      # temporary fix until phpunit-bridge has a release supporting 8.1
+      - name: "Require latest dev PHPUnitBridge for PHP 8.1"
+        if: "matrix.experimental"
+        # using ~ here to avoid issues with windows CLI removing the ^
+        run: 'composer require --no-update --dev "symfony/phpunit-bridge:~5.4@dev"'
+
+      - name: "Set ignored deprecations for php 8.1+ on lowest or locked deps"
+        if: "matrix.php-version >= '8.1' && !contains(matrix.dependencies, 'highest')"
+        run: "echo \"SYMFONY_DEPRECATIONS_HELPER=baselineFile=./tests/deprecations-8.1.json&max[direct]=0\" >> $GITHUB_ENV"
+
       - name: "Update dev requirements to latest available for the current PHP even on locked builds as they are not bundled dependencies"
-        run: "composer update ${{ env.COMPOSER_FLAGS }} symfony/phpunit-bridge phpspec/prophecy phpdocumentor/* sebastian/* doctrine/instantiator"
+        run: "composer config platform --unset && composer update ${{ env.COMPOSER_FLAGS }} symfony/phpunit-bridge phpspec/prophecy phpdocumentor/* sebastian/* doctrine/instantiator"
 
       - name: "Run install again using composer binary from source"
         run: "bin/composer install ${{ env.COMPOSER_FLAGS }}"
-
-      - name: "Validate composer.json"
-        run: "bin/composer validate"
 
       - name: "Prepare git environment"
         run: "git config --global user.name composer && git config --global user.email composer@example.com"
@@ -123,3 +130,27 @@ jobs:
       - name: "Run complete test suite on 7.3"
         if: "matrix.php-version == '7.3'"
         run: "vendor/bin/simple-phpunit --configuration tests/complete.phpunit.xml"
+
+  validation:
+    name: "Composer validation"
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Checkout"
+        uses: "actions/checkout@v3"
+
+      - name: "Install PHP"
+        uses: "shivammathur/setup-php@v2"
+        with:
+          coverage: "none"
+          extensions: "intl, zip"
+          ini-values: "memory_limit=-1, phar.readonly=0, error_reporting=E_ALL, display_errors=On"
+          php-version: "7.4"
+          tools: composer
+
+      - name: "Install dependencies"
+        run: "composer install ${{ env.COMPOSER_FLAGS }}"
+
+      - name: "Validate composer.json"
+        run: "bin/composer validate --strict"

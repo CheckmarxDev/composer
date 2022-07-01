@@ -24,10 +24,25 @@ use Composer\Util\Http\Response;
  */
 class GitLabDriverTest extends TestCase
 {
+    /**
+     * @var string
+     */
     private $home;
+    /**
+     * @var Config
+     */
     private $config;
+    /**
+     * @var \Prophecy\Prophecy\ObjectProphecy
+     */
     private $io;
+    /**
+     * @var \Prophecy\Prophecy\ObjectProphecy
+     */
     private $process;
+    /**
+     * @var \Prophecy\Prophecy\ObjectProphecy
+     */
     private $httpDownloader;
 
     public function setUp()
@@ -57,7 +72,7 @@ class GitLabDriverTest extends TestCase
         $fs->removeDirectory($this->home);
     }
 
-    public function getInitializeUrls()
+    public function provideInitializeUrls()
     {
         return array(
             array('https://gitlab.com/mygroup/myproject', 'https://gitlab.com/api/v4/projects/mygroup%2Fmyproject'),
@@ -67,7 +82,10 @@ class GitLabDriverTest extends TestCase
     }
 
     /**
-     * @dataProvider getInitializeUrls
+     * @dataProvider provideInitializeUrls
+     *
+     * @param string $url
+     * @param string $apiUrl
      */
     public function testInitialize($url, $apiUrl)
     {
@@ -77,6 +95,8 @@ class GitLabDriverTest extends TestCase
     "id": 17,
     "default_branch": "mymaster",
     "visibility": "private",
+    "issues_enabled": true,
+    "archived": false,
     "http_url_to_repo": "https://gitlab.com/mygroup/myproject.git",
     "ssh_url_to_repo": "git@gitlab.com:mygroup/myproject.git",
     "last_activity_at": "2014-12-01T09:17:51.000+01:00",
@@ -104,7 +124,10 @@ JSON;
     }
 
     /**
-     * @dataProvider getInitializeUrls
+     * @dataProvider provideInitializeUrls
+     *
+     * @param string $url
+     * @param string $apiUrl
      */
     public function testInitializePublicProject($url, $apiUrl)
     {
@@ -141,7 +164,10 @@ JSON;
     }
 
     /**
-     * @dataProvider getInitializeUrls
+     * @dataProvider provideInitializeUrls
+     *
+     * @param string $url
+     * @param string $apiUrl
      */
     public function testInitializePublicProjectAsAnonymous($url, $apiUrl)
     {
@@ -402,6 +428,9 @@ JSON;
     /**
      * @group gitlabHttpPort
      * @dataProvider dataForTestSupports
+     *
+     * @param string $url
+     * @param bool   $expected
      */
     public function testSupports($url, $expected)
     {
@@ -561,6 +590,45 @@ JSON;
         $driver->initialize();
     }
 
+    public function testProtocolOverrideRepositoryUrlGeneration()
+    {
+        // @link http://doc.gitlab.com/ce/api/projects.html#get-single-project
+        $projectData = <<<JSON
+{
+    "id": 17,
+    "default_branch": "mymaster",
+    "visibility": "private",
+    "http_url_to_repo": "https://gitlab.com/mygroup/myproject.git",
+    "ssh_url_to_repo": "git@gitlab.com:mygroup/myproject.git",
+    "last_activity_at": "2014-12-01T09:17:51.000+01:00",
+    "name": "My Project",
+    "name_with_namespace": "My Group / My Project",
+    "path": "myproject",
+    "path_with_namespace": "mygroup/myproject",
+    "web_url": "https://gitlab.com/mygroup/myproject"
+}
+JSON;
+
+        $apiUrl = 'https://gitlab.com/api/v4/projects/mygroup%2Fmyproject';
+        $url = 'git@gitlab.com:mygroup/myproject';
+        $this->mockResponse($apiUrl, array(), $projectData)
+            ->shouldBeCalledTimes(1)
+        ;
+
+        $config = clone $this->config;
+        $config->merge(array('config' => array('gitlab-protocol' => 'http')));
+        $driver = new GitLabDriver(array('url' => $url), $this->io->reveal(), $config, $this->httpDownloader->reveal(), $this->process->reveal());
+        $driver->initialize();
+        $this->assertEquals('https://gitlab.com/mygroup/myproject.git', $driver->getRepositoryUrl(), 'Repository URL matches config request for http not git');
+    }
+
+    /**
+     * @param string      $url
+     * @param mixed[]     $options
+     * @param string|null $return
+     *
+     * @return \Prophecy\Prophecy\MethodProphecy
+     */
     private function mockResponse($url, $options, $return)
     {
         return $this->httpDownloader

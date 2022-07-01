@@ -12,6 +12,8 @@
 
 namespace Composer\Repository;
 
+use Composer\Package\BasePackage;
+use Composer\Package\PackageInterface;
 use Composer\Package\Version\VersionParser;
 use Composer\Semver\Constraint\ConstraintInterface;
 use Composer\Semver\Constraint\Constraint;
@@ -30,6 +32,12 @@ use Composer\Package\Link;
  */
 class InstalledRepository extends CompositeRepository
 {
+    /**
+     * @param string $name
+     * @param ConstraintInterface|string|null $constraint
+     *
+     * @return BasePackage[]
+     */
     public function findPackagesWithReplacersAndProviders($name, $constraint = null)
     {
         $name = strtolower($name);
@@ -52,7 +60,7 @@ class InstalledRepository extends CompositeRepository
                 foreach (array_merge($candidate->getProvides(), $candidate->getReplaces()) as $link) {
                     if (
                         $name === $link->getTarget()
-                        && ($constraint === null || $link->getConstraint() === null || $constraint->matches($link->getConstraint()))
+                        && ($constraint === null || $constraint->matches($link->getConstraint()))
                     ) {
                         $matches[] = $candidate;
                         continue 2;
@@ -75,7 +83,9 @@ class InstalledRepository extends CompositeRepository
      * @param  bool                     $invert        Whether to invert matches to discover reasons for the package *NOT* to be installed.
      * @param  bool                     $recurse       Whether to recursively expand the requirement tree up to the root package.
      * @param  string[]                 $packagesFound Used internally when recurring
-     * @return array                    An associative array of arrays as described above.
+     *
+     * @return array[] An associative array of arrays as described above.
+     * @phpstan-return array<array{0: PackageInterface, 1: Link, 2: mixed[]|bool}>
      */
     public function getDependents($needle, $constraint = null, $invert = false, $recurse = true, $packagesFound = null)
     {
@@ -114,7 +124,7 @@ class InstalledRepository extends CompositeRepository
                 foreach ($package->getReplaces() as $link) {
                     foreach ($needles as $needle) {
                         if ($link->getSource() === $needle) {
-                            if ($constraint === null || ($link->getConstraint()->matches($constraint) === !$invert)) {
+                            if ($constraint === null || ($link->getConstraint()->matches($constraint) === true)) {
                                 // already displayed this node's dependencies, cutting short
                                 if (in_array($link->getTarget(), $packagesInTree)) {
                                     $results[] = array($package, $link, false);
@@ -221,7 +231,7 @@ class InstalledRepository extends CompositeRepository
                                 }
 
                                 $results[] = array($package, $link, false);
-                                $results[] = array($rootPackage, new Link($rootPackage->getName(), $link->getTarget(), new MatchAllConstraint, 'does not require', 'but ' . $pkg->getPrettyVersion() . ' is installed'), false);
+                                $results[] = array($rootPackage, new Link($rootPackage->getName(), $link->getTarget(), new MatchAllConstraint, Link::TYPE_DOES_NOT_REQUIRE, 'but ' . $pkg->getPrettyVersion() . ' is installed'), false);
                             } else {
                                 // no root so let's just print whatever we found
                                 $results[] = array($package, $link, false);
@@ -247,8 +257,7 @@ class InstalledRepository extends CompositeRepository
     }
 
     /**
-     * Add a repository.
-     * @param RepositoryInterface $repository
+     * @inheritDoc
      */
     public function addRepository(RepositoryInterface $repository)
     {
@@ -258,7 +267,9 @@ class InstalledRepository extends CompositeRepository
             || $repository instanceof RootPackageRepository
             || $repository instanceof PlatformRepository
         ) {
-            return parent::addRepository($repository);
+            parent::addRepository($repository);
+
+            return;
         }
 
         throw new \LogicException('An InstalledRepository can not contain a repository of type '.get_class($repository).' ('.$repository->getRepoName().')');

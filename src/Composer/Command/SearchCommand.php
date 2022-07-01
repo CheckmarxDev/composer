@@ -29,19 +29,17 @@ use Composer\Plugin\PluginEvents;
  */
 class SearchCommand extends BaseCommand
 {
-    protected $matches;
-    protected $lowMatches = array();
-    protected $tokens;
-    protected $output;
-    protected $onlyName;
-
+    /**
+     * @return void
+     */
     protected function configure()
     {
         $this
             ->setName('search')
             ->setDescription('Searches for packages.')
             ->setDefinition(array(
-                new InputOption('only-name', 'N', InputOption::VALUE_NONE, 'Search only in name'),
+                new InputOption('only-name', 'N', InputOption::VALUE_NONE, 'Search only in package names'),
+                new InputOption('only-vendor', 'O', InputOption::VALUE_NONE, 'Search only for vendor / organization names, returns only "vendor" as result'),
                 new InputOption('type', 't', InputOption::VALUE_REQUIRED, 'Search for a specific package type'),
                 new InputOption('format', 'f', InputOption::VALUE_REQUIRED, 'Format of the output: text or json', 'text'),
                 new InputArgument('tokens', InputArgument::IS_ARRAY | InputArgument::REQUIRED, 'tokens to search for'),
@@ -80,15 +78,42 @@ EOT
         $commandEvent = new CommandEvent(PluginEvents::COMMAND, 'search', $input, $output);
         $composer->getEventDispatcher()->dispatch($commandEvent->getName(), $commandEvent);
 
-        $onlyName = $input->getOption('only-name');
-        $type = $input->getOption('type') ?: null;
+        $mode = RepositoryInterface::SEARCH_FULLTEXT;
+        if ($input->getOption('only-name') === true) {
+            if ($input->getOption('only-vendor') === true) {
+                throw new \InvalidArgumentException('--only-name and --only-vendor cannot be used together');
+            }
+            $mode = RepositoryInterface::SEARCH_NAME;
+        } elseif ($input->getOption('only-vendor') === true) {
+            $mode = RepositoryInterface::SEARCH_VENDOR;
+        }
 
-        $flags = $onlyName ? RepositoryInterface::SEARCH_NAME : RepositoryInterface::SEARCH_FULLTEXT;
-        $results = $repos->search(implode(' ', $input->getArgument('tokens')), $flags, $type);
+        $type = $input->getOption('type');
+
+        $query = implode(' ', $input->getArgument('tokens'));
+        if ($mode !== RepositoryInterface::SEARCH_FULLTEXT) {
+            $query = preg_quote($query);
+        }
+
+        $results = $repos->search($query, $mode, $type);
 
         if ($results && $format === 'text') {
+            $width = $this->getTerminalWidth();
+
+            $nameLength = 0;
             foreach ($results as $result) {
-                $io->write($result['name'] . (isset($result['description']) ? ' '. $result['description'] : ''));
+                $nameLength = max(strlen($result['name']), $nameLength);
+            }
+            $nameLength += 1;
+            foreach ($results as $result) {
+                $description = isset($result['description']) ? $result['description'] : '';
+                $warning = !empty($result['abandoned']) ? '<warning>! Abandoned !</warning> ' : '';
+                $remaining = $width - $nameLength - strlen($warning) - 2;
+                if (strlen($description) > $remaining) {
+                    $description = substr($description, 0, $remaining - 3) . '...';
+                }
+
+                $io->write(str_pad($result['name'], $nameLength, ' ') . $warning . $description);
             }
         } elseif ($format === 'json') {
             $io->write(JsonFile::encode($results));
