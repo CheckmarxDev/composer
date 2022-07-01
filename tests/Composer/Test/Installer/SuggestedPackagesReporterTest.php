@@ -12,7 +12,9 @@
 
 namespace Composer\Test\Installer;
 
+use Composer\InstalledVersions;
 use Composer\Installer\SuggestedPackagesReporter;
+use Composer\Semver\VersionParser;
 use Composer\Test\TestCase;
 
 /**
@@ -20,7 +22,14 @@ use Composer\Test\TestCase;
  */
 class SuggestedPackagesReporterTest extends TestCase
 {
+    /**
+     * @var \PHPUnit\Framework\MockObject\MockObject
+     */
     private $io;
+
+    /**
+     * @var \Composer\Installer\SuggestedPackagesReporter
+     */
     private $suggestedPackagesReporter;
 
     protected function setUp()
@@ -179,9 +188,12 @@ class SuggestedPackagesReporterTest extends TestCase
             ->method('write')
             ->with(' - <info>target1</info>: [1;37;42m Like us on Facebook [0m');
 
+        $expectedWrite = InstalledVersions::satisfies(new VersionParser(), 'symfony/console', '^4.4.37 || ~5.3.14 || ^5.4.3 || ^6.0.3')
+            ? ' - <info>target2</info>: \\<bg=green\\>Like us on Facebook\\</\\>'
+            : ' - <info>target2</info>: \\<bg=green>Like us on Facebook\\</>';
         $this->io->expects($this->at(2))
             ->method('write')
-            ->with(' - <info>target2</info>: \\<bg=green>Like us on Facebook\\</>');
+            ->with($expectedWrite);
 
         $this->suggestedPackagesReporter->output(SuggestedPackagesReporter::MODE_BY_PACKAGE);
     }
@@ -267,6 +279,9 @@ class SuggestedPackagesReporterTest extends TestCase
         $this->suggestedPackagesReporter->output(SuggestedPackagesReporter::MODE_BY_PACKAGE, $repository);
     }
 
+    /**
+     * @return array<string, string>
+     */
     private function getSuggestedPackageArray()
     {
         return array(
@@ -276,10 +291,13 @@ class SuggestedPackagesReporterTest extends TestCase
         );
     }
 
+    /**
+     * @return \Composer\Package\PackageInterface&\PHPUnit\Framework\MockObject\MockObject
+     */
     private function createPackageMock()
     {
         return $this->getMockBuilder('Composer\Package\Package')
-            ->setConstructorArgs(array(md5(mt_rand()), '1.0.0.0', '1.0.0'))
+            ->setConstructorArgs(array(md5((string) mt_rand()), '1.0.0.0', '1.0.0'))
             ->getMock();
     }
 }

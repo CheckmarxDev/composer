@@ -16,6 +16,7 @@ use Composer\DependencyResolver\Transaction;
 use Composer\Installer\InstallerEvent;
 use Composer\IO\IOInterface;
 use Composer\Composer;
+use Composer\Pcre\Preg;
 use Composer\Util\Platform;
 use Composer\DependencyResolver\Operation\OperationInterface;
 use Composer\Repository\RepositoryInterface;
@@ -53,6 +54,8 @@ class EventDispatcher
     protected $process;
     /** @var array<string, array<int, array<callable|string>>> */
     protected $listeners = array();
+    /** @var bool */
+    protected $runScripts = true;
     /** @var list<string> */
     private $eventStack;
 
@@ -69,6 +72,19 @@ class EventDispatcher
         $this->io = $io;
         $this->process = $process ?: new ProcessExecutor($io);
         $this->eventStack = array();
+    }
+
+    /**
+     * Set whether script handlers are active or not
+     *
+     * @param bool $runScripts
+     * @return $this
+     */
+    public function setRunScripts($runScripts = true)
+    {
+        $this->runScripts = (bool) $runScripts;
+
+        return $this;
     }
 
     /**
@@ -91,12 +107,12 @@ class EventDispatcher
     /**
      * Dispatch a script event.
      *
-     * @param  string $eventName      The constant in ScriptEvents
-     * @param  bool   $devMode
-     * @param  array  $additionalArgs Arguments passed by the user
-     * @param  array  $flags          Optional flags to pass data not as argument
-     * @return int    return code of the executed script if any, for php scripts a false return
-     *                               value is changed to 1, anything else to 0
+     * @param  string               $eventName      The constant in ScriptEvents
+     * @param  bool                 $devMode
+     * @param  array<int, mixed>    $additionalArgs Arguments passed by the user
+     * @param  array<string, mixed> $flags          Optional flags to pass data not as argument
+     * @return int                                  return code of the executed script if any, for php scripts a false return
+     *                                              value is changed to 1, anything else to 0
      */
     public function dispatchScript($eventName, $devMode = false, $additionalArgs = array(), $flags = array())
     {
@@ -106,11 +122,11 @@ class EventDispatcher
     /**
      * Dispatch a package event.
      *
-     * @param string              $eventName  The constant in PackageEvents
-     * @param bool                $devMode    Whether or not we are in dev mode
-     * @param RepositoryInterface $localRepo  The installed repository
-     * @param array               $operations The list of operations
-     * @param OperationInterface  $operation  The package being installed/updated/removed
+     * @param string               $eventName  The constant in PackageEvents
+     * @param bool                 $devMode    Whether or not we are in dev mode
+     * @param RepositoryInterface  $localRepo  The installed repository
+     * @param OperationInterface[] $operations The list of operations
+     * @param OperationInterface   $operation  The package being installed/updated/removed
      *
      * @return int return code of the executed script if any, for php scripts a false return
      *             value is changed to 1, anything else to 0
@@ -146,7 +162,7 @@ class EventDispatcher
      */
     protected function doDispatch(Event $event)
     {
-        if (getenv('COMPOSER_DEBUG_EVENTS')) {
+        if (Platform::getEnv('COMPOSER_DEBUG_EVENTS')) {
             $details = null;
             if ($event instanceof PackageEvent) {
                 $details = (string) $event->getOperation();
@@ -184,7 +200,7 @@ class EventDispatcher
                     $args = array_merge($script, $event->getArguments());
                     $flags = $event->getFlags();
                     if (strpos($callable, '@composer ') === 0) {
-                        $exec = $this->getPhpExecCommand() . ' ' . ProcessExecutor::escape(getenv('COMPOSER_BINARY')) . ' ' . implode(' ', $args);
+                        $exec = $this->getPhpExecCommand() . ' ' . ProcessExecutor::escape(Platform::getEnv('COMPOSER_BINARY')) . ' ' . implode(' ', $args);
                         if (0 !== ($exitCode = $this->executeTty($exec))) {
                             $this->io->writeError(sprintf('<error>Script %s handling the %s event returned with error code '.$exitCode.'</error>', $callable, $event->getName()), true, IOInterface::QUIET);
 
@@ -238,32 +254,35 @@ class EventDispatcher
                     $possibleLocalBinaries = $this->composer->getPackage()->getBinaries();
                     if ($possibleLocalBinaries) {
                         foreach ($possibleLocalBinaries as $localExec) {
-                            if (preg_match('{\b'.preg_quote($callable).'$}', $localExec)) {
+                            if (Preg::isMatch('{\b'.preg_quote($callable).'$}', $localExec)) {
                                 $caller = BinaryInstaller::determineBinaryCaller($localExec);
-                                $exec = preg_replace('{^'.preg_quote($callable).'}', $caller . ' ' . $localExec, $exec);
+                                $exec = Preg::replace('{^'.preg_quote($callable).'}', $caller . ' ' . $localExec, $exec);
                                 break;
                             }
                         }
                     }
 
                     if (strpos($exec, '@putenv ') === 0) {
-                        putenv(substr($exec, 8));
-                        list($var, $value) = explode('=', substr($exec, 8), 2);
-                        $_SERVER[$var] = $value;
+                        if (false === strpos($exec, '=')) {
+                            Platform::clearEnv(substr($exec, 8));
+                        } else {
+                            list($var, $value) = explode('=', substr($exec, 8), 2);
+                            Platform::putEnv($var, $value);
+                        }
 
                         continue;
                     }
                     if (strpos($exec, '@php ') === 0) {
                         $pathAndArgs = substr($exec, 5);
                         if (Platform::isWindows()) {
-                            $pathAndArgs = preg_replace_callback('{^\S+}', function ($path) {
+                            $pathAndArgs = Preg::replaceCallback('{^\S+}', function ($path) {
                                 return str_replace('/', '\\', $path[0]);
                             }, $pathAndArgs);
                         }
                         // match somename (not in quote, and not a qualified path) and if it is not a valid path from CWD then try to find it
                         // in $PATH. This allows support for `@php foo` where foo is a binary name found in PATH but not an actual relative path
-                        preg_match('{^[^\'"\s/\\\\]+}', $pathAndArgs, $match);
-                        if (!file_exists($match[0])) {
+                        $matched = Preg::isMatch('{^[^\'"\s/\\\\]+}', $pathAndArgs, $match);
+                        if ($matched && !file_exists($match[0])) {
                             $finder = new ExecutableFinder;
                             if ($pathToExec = $finder->find($match[0])) {
                                 $pathAndArgs = $pathToExec . substr($pathAndArgs, strlen($match[0]));
@@ -274,12 +293,11 @@ class EventDispatcher
                         $finder = new PhpExecutableFinder();
                         $phpPath = $finder->find(false);
                         if ($phpPath) {
-                            $_SERVER['PHP_BINARY'] = $phpPath;
-                            putenv('PHP_BINARY=' . $_SERVER['PHP_BINARY']);
+                            Platform::putEnv('PHP_BINARY', $phpPath);
                         }
 
                         if (Platform::isWindows()) {
-                            $exec = preg_replace_callback('{^\S+}', function ($path) {
+                            $exec = Preg::replaceCallback('{^\S+}', function ($path) {
                                 return str_replace('/', '\\', $path[0]);
                             }, $exec);
                         }
@@ -289,7 +307,7 @@ class EventDispatcher
                     // resolution, even if bin-dir contains composer too because the project requires composer/composer
                     // see https://github.com/composer/composer/issues/8748
                     if (strpos($exec, 'composer ') === 0) {
-                        $exec = $this->getPhpExecCommand() . ' ' . ProcessExecutor::escape(getenv('COMPOSER_BINARY')) . substr($exec, 8);
+                        $exec = $this->getPhpExecCommand() . ' ' . ProcessExecutor::escape(Platform::getEnv('COMPOSER_BINARY')) . substr($exec, 8);
                     }
 
                     if (0 !== ($exitCode = $this->executeTty($exec))) {
@@ -320,6 +338,11 @@ class EventDispatcher
         return $returnMax;
     }
 
+    /**
+     * @param string $exec
+     *
+     * @return int
+     */
     protected function executeTty($exec)
     {
         if ($this->io->isInteractive()) {
@@ -329,6 +352,9 @@ class EventDispatcher
         return $this->process->execute($exec);
     }
 
+    /**
+     * @return string
+     */
     protected function getPhpExecCommand()
     {
         $finder = new PhpExecutableFinder();
@@ -349,6 +375,8 @@ class EventDispatcher
      * @param string $className
      * @param string $methodName
      * @param Event  $event      Event invoking the PHP callable
+     *
+     * @return mixed
      */
     protected function executeEventPhpScript($className, $methodName, Event $event)
     {
@@ -367,6 +395,8 @@ class EventDispatcher
      * @param string   $eventName The event name - typically a constant
      * @param callable $listener  A callable expecting an event argument
      * @param int      $priority  A higher value represents a higher priority
+     *
+     * @return void
      */
     public function addListener($eventName, $listener, $priority = 0)
     {
@@ -375,6 +405,8 @@ class EventDispatcher
 
     /**
      * @param callable|object $listener A callable or an object instance for which all listeners should be removed
+     *
+     * @return void
      */
     public function removeListener($listener)
     {
@@ -395,6 +427,8 @@ class EventDispatcher
      * @see EventSubscriberInterface
      *
      * @param EventSubscriberInterface $subscriber
+     *
+     * @return void
      */
     public function addSubscriber(EventSubscriberInterface $subscriber)
     {
@@ -415,11 +449,11 @@ class EventDispatcher
      * Retrieves all listeners for a given event
      *
      * @param  Event $event
-     * @return array All listeners: callables and scripts
+     * @return array<callable|string> All listeners: callables and scripts
      */
     protected function getListeners(Event $event)
     {
-        $scriptListeners = $this->getScriptListeners($event);
+        $scriptListeners = $this->runScripts ? $this->getScriptListeners($event) : array();
 
         if (!isset($this->listeners[$event->getName()][0])) {
             $this->listeners[$event->getName()][0] = array();
@@ -449,7 +483,7 @@ class EventDispatcher
      * Finds all listeners defined as scripts in the package
      *
      * @param  Event $event Event object
-     * @return array Listeners
+     * @return string[] Listeners
      */
     protected function getScriptListeners(Event $event)
     {
@@ -520,27 +554,30 @@ class EventDispatcher
     /**
      * Pops the active event from the stack
      *
-     * @return mixed
+     * @return string|null
      */
     protected function popEvent()
     {
         return array_pop($this->eventStack);
     }
 
+    /**
+     * @return void
+     */
     private function ensureBinDirIsInPath()
     {
-        $pathStr = 'PATH';
-        if (!isset($_SERVER[$pathStr]) && isset($_SERVER['Path'])) {
-            $pathStr = 'Path';
+        $pathEnv = 'PATH';
+        if (false === Platform::getEnv('PATH') && false !== Platform::getEnv('Path')) {
+            $pathEnv = 'Path';
         }
 
         // add the bin dir to the PATH to make local binaries of deps usable in scripts
         $binDir = $this->composer->getConfig()->get('bin-dir');
         if (is_dir($binDir)) {
             $binDir = realpath($binDir);
-            if (isset($_SERVER[$pathStr]) && !preg_match('{(^|'.PATH_SEPARATOR.')'.preg_quote($binDir).'($|'.PATH_SEPARATOR.')}', $_SERVER[$pathStr])) {
-                $_SERVER[$pathStr] = $binDir.PATH_SEPARATOR.getenv($pathStr);
-                putenv($pathStr.'='.$_SERVER[$pathStr]);
+            $pathValue = Platform::getEnv($pathEnv);
+            if (!Preg::isMatch('{(^|'.PATH_SEPARATOR.')'.preg_quote($binDir).'($|'.PATH_SEPARATOR.')}', $pathValue)) {
+                Platform::putEnv($pathEnv, $binDir.PATH_SEPARATOR.$pathValue);
             }
         }
     }

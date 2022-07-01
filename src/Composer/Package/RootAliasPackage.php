@@ -17,23 +17,23 @@ namespace Composer\Package;
  */
 class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterface
 {
-    /** @var RootPackageInterface */
+    /** @var RootPackage */
     protected $aliasOf;
 
     /**
      * All descendants' constructors should call this parent constructor
      *
-     * @param RootPackageInterface $aliasOf       The package this package is an alias of
-     * @param string                   $version       The version the alias must report
-     * @param string                   $prettyVersion The alias's non-normalized version
+     * @param RootPackage $aliasOf       The package this package is an alias of
+     * @param string      $version       The version the alias must report
+     * @param string      $prettyVersion The alias's non-normalized version
      */
-    public function __construct(RootPackageInterface $aliasOf, $version, $prettyVersion)
+    public function __construct(RootPackage $aliasOf, $version, $prettyVersion)
     {
         parent::__construct($aliasOf, $version, $prettyVersion);
     }
 
     /**
-     * @return RootPackageInterface
+     * @return RootPackage
      */
     public function getAliasOf()
     {
@@ -41,7 +41,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function getAliases()
     {
@@ -49,7 +49,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function getMinimumStability()
     {
@@ -57,7 +57,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function getStabilityFlags()
     {
@@ -65,7 +65,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function getReferences()
     {
@@ -73,7 +73,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function getPreferStable()
     {
@@ -81,7 +81,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function getConfig()
     {
@@ -89,7 +89,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setRequires(array $require)
     {
@@ -99,7 +99,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setDevRequires(array $devRequire)
     {
@@ -109,7 +109,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setConflicts(array $conflicts)
     {
@@ -118,7 +118,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setProvides(array $provides)
     {
@@ -127,7 +127,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setReplaces(array $replaces)
     {
@@ -136,7 +136,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setAutoload(array $autoload)
     {
@@ -144,7 +144,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setDevAutoload(array $devAutoload)
     {
@@ -152,7 +152,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setStabilityFlags(array $stabilityFlags)
     {
@@ -160,7 +160,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setMinimumStability($minimumStability)
     {
@@ -168,7 +168,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setPreferStable($preferStable)
     {
@@ -176,7 +176,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setConfig(array $config)
     {
@@ -184,7 +184,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setReferences(array $references)
     {
@@ -192,7 +192,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setAliases(array $aliases)
     {
@@ -200,7 +200,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setSuggests(array $suggests)
     {
@@ -208,7 +208,7 @@ class RootAliasPackage extends CompleteAliasPackage implements RootPackageInterf
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     public function setExtra(array $extra)
     {

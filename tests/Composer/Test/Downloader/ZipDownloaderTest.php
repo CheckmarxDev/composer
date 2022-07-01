@@ -21,13 +21,15 @@ use Composer\Util\Loop;
 
 class ZipDownloaderTest extends TestCase
 {
-    /**
-     * @var string
-     */
+    /** @var string */
     private $testDir;
+    /** @var \Composer\Util\HttpDownloader */
     private $httpDownloader;
+    /** @var \Composer\IO\IOInterface&\PHPUnit\Framework\MockObject\MockObject */
     private $io;
+    /** @var \Composer\Config&\PHPUnit\Framework\MockObject\MockObject */
     private $config;
+    /** @var \Composer\Package\PackageInterface&\PHPUnit\Framework\MockObject\MockObject */
     private $package;
 
     public function setUp()
@@ -44,10 +46,15 @@ class ZipDownloaderTest extends TestCase
     {
         $fs = new Filesystem;
         $fs->removeDirectory($this->testDir);
-        $this->setPrivateProperty('hasSystemUnzip', null);
         $this->setPrivateProperty('hasZipArchive', null);
     }
 
+    /**
+     * @param string $name
+     * @param mixed $value
+     * @param ?\Composer\Test\Downloader\MockedZipDownloader $obj
+     * @return void
+     */
     public function setPrivateProperty($name, $value, $obj = null)
     {
         $reflectionClass = new \ReflectionClass('Composer\Downloader\ZipDownloader');
@@ -86,8 +93,6 @@ class ZipDownloaderTest extends TestCase
 
         $downloader = new ZipDownloader($this->io, $this->config, $this->httpDownloader);
 
-        $this->setPrivateProperty('hasSystemUnzip', false);
-
         try {
             $loop = new Loop($this->httpDownloader);
             $promise = $downloader->download($this->package, $path = sys_get_temp_dir().'/composer-zip-test');
@@ -107,7 +112,6 @@ class ZipDownloaderTest extends TestCase
             $this->markTestSkipped('zip extension missing');
         }
 
-        $this->setPrivateProperty('hasSystemUnzip', false);
         $this->setPrivateProperty('hasZipArchive', true);
         $downloader = new MockedZipDownloader($this->io, $this->config, $this->httpDownloader);
         $zipArchive = $this->getMockBuilder('ZipArchive')->getMock();
@@ -130,7 +134,6 @@ class ZipDownloaderTest extends TestCase
             $this->markTestSkipped('zip extension missing');
         }
 
-        $this->setPrivateProperty('hasSystemUnzip', false);
         $this->setPrivateProperty('hasZipArchive', true);
         $downloader = new MockedZipDownloader($this->io, $this->config, $this->httpDownloader);
         $zipArchive = $this->getMockBuilder('ZipArchive')->getMock();
@@ -152,7 +155,6 @@ class ZipDownloaderTest extends TestCase
             $this->markTestSkipped('zip extension missing');
         }
 
-        $this->setPrivateProperty('hasSystemUnzip', false);
         $this->setPrivateProperty('hasZipArchive', true);
         $downloader = new MockedZipDownloader($this->io, $this->config, $this->httpDownloader);
         $zipArchive = $this->getMockBuilder('ZipArchive')->getMock();
@@ -172,8 +174,8 @@ class ZipDownloaderTest extends TestCase
     {
         $this->setExpectedException('Exception', 'Failed to extract : (1) unzip');
         $this->setPrivateProperty('isWindows', false);
-        $this->setPrivateProperty('hasSystemUnzip', true);
         $this->setPrivateProperty('hasZipArchive', false);
+        $this->setPrivateProperty('unzipCommands', array(array('unzip', 'unzip -qq %s -d %s')));
 
         $procMock = $this->getMockBuilder('Symfony\Component\Process\Process')->disableOriginalConstructor()->getMock();
         $procMock->expects($this->any())
@@ -199,8 +201,8 @@ class ZipDownloaderTest extends TestCase
     public function testSystemUnzipOnlyGood()
     {
         $this->setPrivateProperty('isWindows', false);
-        $this->setPrivateProperty('hasSystemUnzip', true);
         $this->setPrivateProperty('hasZipArchive', false);
+        $this->setPrivateProperty('unzipCommands', array(array('unzip', 'unzip -qq %s -d %s')));
 
         $procMock = $this->getMockBuilder('Symfony\Component\Process\Process')->disableOriginalConstructor()->getMock();
         $procMock->expects($this->any())
@@ -230,7 +232,6 @@ class ZipDownloaderTest extends TestCase
         }
 
         $this->setPrivateProperty('isWindows', false);
-        $this->setPrivateProperty('hasSystemUnzip', true);
         $this->setPrivateProperty('hasZipArchive', true);
 
         $procMock = $this->getMockBuilder('Symfony\Component\Process\Process')->disableOriginalConstructor()->getMock();
@@ -271,7 +272,6 @@ class ZipDownloaderTest extends TestCase
         }
 
         $this->setPrivateProperty('isWindows', false);
-        $this->setPrivateProperty('hasSystemUnzip', true);
         $this->setPrivateProperty('hasZipArchive', true);
 
         $procMock = $this->getMockBuilder('Symfony\Component\Process\Process')->disableOriginalConstructor()->getMock();
@@ -304,65 +304,10 @@ class ZipDownloaderTest extends TestCase
         $this->wait($promise);
     }
 
-    public function testWindowsFallbackGood()
-    {
-        if (!class_exists('ZipArchive')) {
-            $this->markTestSkipped('zip extension missing');
-        }
-
-        $this->setPrivateProperty('isWindows', true);
-        $this->setPrivateProperty('hasSystemUnzip', true);
-        $this->setPrivateProperty('hasZipArchive', true);
-
-        $processExecutor = $this->getMockBuilder('Composer\Util\ProcessExecutor')->getMock();
-        $processExecutor->expects($this->atLeastOnce())
-            ->method('execute')
-            ->will($this->returnValue(0));
-
-        $zipArchive = $this->getMockBuilder('ZipArchive')->getMock();
-        $zipArchive->expects($this->at(0))
-            ->method('open')
-            ->will($this->returnValue(true));
-        $zipArchive->expects($this->at(1))
-            ->method('extractTo')
-            ->will($this->returnValue(false));
-
-        $downloader = new MockedZipDownloader($this->io, $this->config, $this->httpDownloader, null, null, null, $processExecutor);
-        $this->setPrivateProperty('zipArchiveObject', $zipArchive, $downloader);
-        $promise = $downloader->extract($this->package, 'testfile.zip', 'vendor/dir');
-        $this->wait($promise);
-    }
-
-    public function testWindowsFallbackFailed()
-    {
-        $this->setExpectedException('Exception', 'Failed to execute (1) unzip');
-        if (!class_exists('ZipArchive')) {
-            $this->markTestSkipped('zip extension missing');
-        }
-
-        $this->setPrivateProperty('isWindows', true);
-        $this->setPrivateProperty('hasSystemUnzip', true);
-        $this->setPrivateProperty('hasZipArchive', true);
-
-        $processExecutor = $this->getMockBuilder('Composer\Util\ProcessExecutor')->getMock();
-        $processExecutor->expects($this->atLeastOnce())
-          ->method('execute')
-          ->will($this->returnValue(1));
-
-        $zipArchive = $this->getMockBuilder('ZipArchive')->getMock();
-        $zipArchive->expects($this->at(0))
-          ->method('open')
-          ->will($this->returnValue(true));
-        $zipArchive->expects($this->at(1))
-          ->method('extractTo')
-          ->will($this->returnValue(false));
-
-        $downloader = new MockedZipDownloader($this->io, $this->config, $this->httpDownloader, null, null, null, $processExecutor);
-        $this->setPrivateProperty('zipArchiveObject', $zipArchive, $downloader);
-        $promise = $downloader->extract($this->package, 'testfile.zip', 'vendor/dir');
-        $this->wait($promise);
-    }
-
+    /**
+     * @param ?\React\Promise\PromiseInterface $promise
+     * @return void
+     */
     private function wait($promise)
     {
         if (null === $promise) {

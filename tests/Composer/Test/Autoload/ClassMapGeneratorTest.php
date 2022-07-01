@@ -27,12 +27,17 @@ class ClassMapGeneratorTest extends TestCase
 {
     /**
      * @dataProvider getTestCreateMapTests
+     * @param string $directory
+     * @param array<string, string> $expected
      */
     public function testCreateMap($directory, $expected)
     {
         $this->assertEqualsNormalized($expected, ClassMapGenerator::createMap($directory));
     }
 
+    /**
+     * @return array<array<string|array<string>>>
+     */
     public function getTestCreateMapTests()
     {
         if (PHP_VERSION_ID == 50303) {
@@ -55,10 +60,15 @@ class ClassMapGeneratorTest extends TestCase
             'Foo\\LargeGap' => realpath(__DIR__) . '/Fixtures/classmap/LargeGap.php',
             'Foo\\MissingSpace' => realpath(__DIR__) . '/Fixtures/classmap/MissingSpace.php',
             'Foo\\StripNoise' => realpath(__DIR__) . '/Fixtures/classmap/StripNoise.php',
+            'Foo\\First' => realpath(__DIR__) . '/Fixtures/classmap/StripNoise.php',
+            'Foo\\Second' => realpath(__DIR__) . '/Fixtures/classmap/StripNoise.php',
+            'Foo\\Third' => realpath(__DIR__) . '/Fixtures/classmap/StripNoise.php',
             'Foo\\SlashedA' => realpath(__DIR__) . '/Fixtures/classmap/BackslashLineEndingString.php',
             'Foo\\SlashedB' => realpath(__DIR__) . '/Fixtures/classmap/BackslashLineEndingString.php',
             'Unicode\\↑\\↑' => realpath(__DIR__) . '/Fixtures/classmap/Unicode.php',
             'ShortOpenTag' => realpath(__DIR__) . '/Fixtures/classmap/ShortOpenTag.php',
+            'Smarty_Internal_Compile_Block' => realpath(__DIR__) . '/Fixtures/classmap/InvalidUnicode.php',
+            'Smarty_Internal_Compile_Blockclose' => realpath(__DIR__) . '/Fixtures/classmap/InvalidUnicode.php',
             'ShortOpenTagDocblock' => realpath(__DIR__) . '/Fixtures/classmap/ShortOpenTagDocblock.php',
         );
 
@@ -244,6 +254,31 @@ class ClassMapGeneratorTest extends TestCase
         $fs->removeDirectory($tempDir);
     }
 
+    public function testCreateMapDoesNotHitRegexBacktraceLimit()
+    {
+        $expected = array(
+            'Foo\\StripNoise' => realpath(__DIR__) . '/Fixtures/pcrebacktracelimit/StripNoise.php',
+            'Foo\\VeryLongHeredoc' => realpath(__DIR__) . '/Fixtures/pcrebacktracelimit/VeryLongHeredoc.php',
+            'Foo\\ClassAfterLongHereDoc' => realpath(__DIR__) . '/Fixtures/pcrebacktracelimit/VeryLongHeredoc.php',
+            'Foo\\VeryLongPHP73Heredoc' => realpath(__DIR__) . '/Fixtures/pcrebacktracelimit/VeryLongPHP73Heredoc.php',
+            'Foo\\VeryLongPHP73Nowdoc' => realpath(__DIR__) . '/Fixtures/pcrebacktracelimit/VeryLongPHP73Nowdoc.php',
+            'Foo\\ClassAfterLongNowDoc' => realpath(__DIR__) . '/Fixtures/pcrebacktracelimit/VeryLongPHP73Nowdoc.php',
+            'Foo\\VeryLongNowdoc' => realpath(__DIR__) . '/Fixtures/pcrebacktracelimit/VeryLongNowdoc.php',
+        );
+
+        ini_set('pcre.backtrack_limit', '30000');
+        $result = ClassMapGenerator::createMap(__DIR__ . '/Fixtures/pcrebacktracelimit');
+        ini_restore('pcre.backtrack_limit');
+
+        $this->assertEqualsNormalized($expected, $result);
+    }
+
+    /**
+     * @param array<class-string> $expected
+     * @param array<class-string> $actual
+     * @param string $message
+     * @return  void
+     */
     protected function assertEqualsNormalized($expected, $actual, $message = '')
     {
         foreach ($expected as $ns => $path) {
@@ -255,6 +290,7 @@ class ClassMapGeneratorTest extends TestCase
         $this->assertEquals($expected, $actual, $message);
     }
 
+    /** @return void */
     private function checkIfFinderIsAvailable()
     {
         if (!class_exists('Symfony\\Component\\Finder\\Finder')) {

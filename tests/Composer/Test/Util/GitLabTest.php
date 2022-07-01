@@ -22,10 +22,15 @@ use Composer\Test\TestCase;
  */
 class GitLabTest extends TestCase
 {
+    /** @var string */
     private $username = 'username';
+    /** @var string */
     private $password = 'password';
+    /** @var string */
     private $message = 'mymessage';
+    /** @var string */
     private $origin = 'gitlab.com';
+    /** @var string */
     private $token = 'gitlabtoken';
 
     public function testUsernamePasswordAuthenticationFlow()
@@ -93,8 +98,9 @@ class GitLabTest extends TestCase
         $httpDownloader
             ->expects($this->exactly(5))
             ->method('get')
-            ->will($this->throwException(new TransportException('', 401)))
+            ->will($this->throwException($e = new TransportException('', 401)))
         ;
+        $e->setResponse('{}');
 
         $config = $this->getConfigMock();
         $config
@@ -108,6 +114,9 @@ class GitLabTest extends TestCase
         $gitLab->authorizeOAuthInteractively('https', $this->origin);
     }
 
+    /**
+     * @return \PHPUnit\Framework\MockObject\MockObject&\Composer\IO\ConsoleIO
+     */
     private function getIOMock()
     {
         $io = $this
@@ -119,11 +128,17 @@ class GitLabTest extends TestCase
         return $io;
     }
 
+    /**
+     * @return \PHPUnit\Framework\MockObject\MockObject&\Composer\Config
+     */
     private function getConfigMock()
     {
         return $this->getMockBuilder('Composer\Config')->getMock();
     }
 
+    /**
+     * @return \PHPUnit\Framework\MockObject\MockObject&\Composer\Util\HttpDownloader
+     */
     private function getHttpDownloaderMock()
     {
         $httpDownloader = $this
@@ -135,6 +150,9 @@ class GitLabTest extends TestCase
         return $httpDownloader;
     }
 
+    /**
+     * @return \PHPUnit\Framework\MockObject\MockObject&\Composer\Config\JsonConfigSource
+     */
     private function getAuthJsonMock()
     {
         $authjson = $this

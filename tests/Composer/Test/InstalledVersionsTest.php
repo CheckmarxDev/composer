@@ -12,27 +12,43 @@
 
 namespace Composer\Test;
 
+use Composer\Autoload\ClassLoader;
 use Composer\InstalledVersions;
 use Composer\Semver\VersionParser;
 
 class InstalledVersionsTest extends TestCase
 {
+    /** @var array<ClassLoader> */
+    private static $previousRegisteredLoaders;
+
+    /**
+     * @var string
+     */
+    private $root;
+
     public static function setUpBeforeClass()
     {
         // disable multiple-ClassLoader-based checks of InstalledVersions by making it seem like no
         // class loaders are registered
         $prop = new \ReflectionProperty('Composer\Autoload\ClassLoader', 'registeredLoaders');
         $prop->setAccessible(true);
+        self::$previousRegisteredLoaders = $prop->getValue();
         $prop->setValue(array());
     }
 
     public static function tearDownAfterClass()
     {
-        self::setUpBeforeClass();
+        $prop = new \ReflectionProperty('Composer\Autoload\ClassLoader', 'registeredLoaders');
+        $prop->setAccessible(true);
+        $prop->setValue(self::$previousRegisteredLoaders);
+        InstalledVersions::reload(null); // @phpstan-ignore-line
     }
 
     public function setUp()
     {
+        $this->root = $this->getUniqueTmpDirectory();
+
+        $dir = $this->root;
         InstalledVersions::reload(require __DIR__.'/Repository/Fixtures/installed.php');
     }
 
@@ -47,12 +63,16 @@ class InstalledVersionsTest extends TestCase
             'foo/impl',
             'foo/impl2',
             'foo/replaced',
+            'meta/package',
         );
         $this->assertSame($names, InstalledVersions::getInstalledPackages());
     }
 
     /**
      * @dataProvider isInstalledProvider
+     * @param bool $expected
+     * @param string $name
+     * @param bool $includeDevRequirements
      */
     public function testIsInstalled($expected, $name, $includeDevRequirements = true)
     {
@@ -69,11 +89,15 @@ class InstalledVersionsTest extends TestCase
             array(true,  '__root__'),
             array(true,  'b/replacer'),
             array(false, 'not/there'),
+            array(true,  'meta/package'),
         );
     }
 
     /**
      * @dataProvider satisfiesProvider
+     * @param bool $expected
+     * @param string $name
+     * @param string $constraint
      */
     public function testSatisfies($expected, $name, $constraint)
     {
@@ -112,6 +136,8 @@ class InstalledVersionsTest extends TestCase
 
     /**
      * @dataProvider getVersionRangesProvider
+     * @param string $expected
+     * @param string $name
      */
     public function testGetVersionRanges($expected, $name)
     {
@@ -134,6 +160,8 @@ class InstalledVersionsTest extends TestCase
 
     /**
      * @dataProvider getVersionProvider
+     * @param ?string $expected
+     * @param string $name
      */
     public function testGetVersion($expected, $name)
     {
@@ -156,6 +184,8 @@ class InstalledVersionsTest extends TestCase
 
     /**
      * @dataProvider getPrettyVersionProvider
+     * @param ?string $expected
+     * @param string $name
      */
     public function testGetPrettyVersion($expected, $name)
     {
@@ -187,6 +217,8 @@ class InstalledVersionsTest extends TestCase
         $this->assertSame(array(
             'pretty_version' => 'dev-master',
             'version' => 'dev-master',
+            'type' => 'library',
+            'install_path' => $this->root . '/./',
             'aliases' => array(
                 '1.10.x-dev',
             ),
@@ -196,13 +228,19 @@ class InstalledVersionsTest extends TestCase
         ), InstalledVersions::getRootPackage());
     }
 
+    /**
+     * @group legacy
+     */
     public function testGetRawData()
     {
+        $dir = $this->root;
         $this->assertSame(require __DIR__.'/Repository/Fixtures/installed.php', InstalledVersions::getRawData());
     }
 
     /**
      * @dataProvider getReferenceProvider
+     * @param ?string $expected
+     * @param string $name
      */
     public function testGetReference($expected, $name)
     {
@@ -221,5 +259,25 @@ class InstalledVersionsTest extends TestCase
             array(null, 'b/replacer'),
             array(null, 'c/c'),
         );
+    }
+
+    public function testGetInstalledPackagesByType()
+    {
+        $names = array(
+            '__root__',
+            'a/provider',
+            'a/provider2',
+            'b/replacer',
+            'c/c',
+        );
+
+        $this->assertSame($names, \Composer\InstalledVersions::getInstalledPackagesByType('library'));
+    }
+
+    public function testGetInstallPath()
+    {
+        $this->assertSame(realpath($this->root), realpath(\Composer\InstalledVersions::getInstallPath('__root__')));
+        $this->assertSame('/foo/bar/vendor/c/c', \Composer\InstalledVersions::getInstallPath('c/c'));
+        $this->assertNull(\Composer\InstalledVersions::getInstallPath('foo/impl'));
     }
 }

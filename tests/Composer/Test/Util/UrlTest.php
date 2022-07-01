@@ -20,6 +20,11 @@ class UrlTest extends TestCase
 {
     /**
      * @dataProvider distRefsProvider
+     *
+     * @param string               $url
+     * @param string               $expectedUrl
+     * @param array<string, mixed> $conf
+     * @param string               $ref
      */
     public function testUpdateDistReference($url, $expectedUrl, $conf = array(), $ref = 'newref')
     {
@@ -61,6 +66,9 @@ class UrlTest extends TestCase
 
     /**
      * @dataProvider sanitizeProvider
+     *
+     * @param string $expected
+     * @param string $url
      */
     public function testSanitize($expected, $url)
     {
@@ -78,6 +86,7 @@ class UrlTest extends TestCase
             array('https://foo:***@example.org:123/', 'https://foo:bar@example.org:123/'),
             array('https://example.org/foo/bar?access_token=***', 'https://example.org/foo/bar?access_token=abcdef'),
             array('https://example.org/foo/bar?foo=bar&access_token=***', 'https://example.org/foo/bar?foo=bar&access_token=abcdef'),
+            array('https://***:***@github.com/acme/repo', 'https://ghp_1234567890abcdefghijklmnopqrstuvwxyzAB:x-oauth-basic@github.com/acme/repo'),
             // without scheme
             array('foo:***@example.org/', 'foo:bar@example.org/'),
             array('foo@example.org/', 'foo@example.org/'),

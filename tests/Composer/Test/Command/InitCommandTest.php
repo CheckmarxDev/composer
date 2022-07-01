@@ -25,6 +25,14 @@ class InitCommandTest extends TestCase
         $this->assertEquals('john@example.com', $author['email']);
     }
 
+    public function testParseValidAuthorStringWithoutEmail()
+    {
+        $command = new InitCommand;
+        $author = $command->parseAuthorString('John Smith');
+        $this->assertEquals('John Smith', $author['name']);
+        $this->assertNull($author['email']);
+    }
+
     public function testParseValidUtf8AuthorString()
     {
         $command = new InitCommand;
@@ -110,8 +118,7 @@ class InitCommandTest extends TestCase
     public function testNamespaceFromMissingPackageName()
     {
         $command = new InitCommand;
-        $namespace = $command->namespaceFromPackageName(null);
+        $namespace = $command->namespaceFromPackageName('');
         $this->assertNull($namespace);
     }
-
 }

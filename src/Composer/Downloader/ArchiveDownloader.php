@@ -27,7 +27,38 @@ use Composer\DependencyResolver\Operation\InstallOperation;
 abstract class ArchiveDownloader extends FileDownloader
 {
     /**
-     * {@inheritDoc}
+     * @var array<string, true>
+     * @protected
+     */
+    public $cleanupExecuted = array();
+
+    /**
+     * @return PromiseInterface|null
+     */
+    public function prepare($type, PackageInterface $package, $path, PackageInterface $prevPackage = null)
+    {
+        unset($this->cleanupExecuted[$package->getName()]);
+
+        return parent::prepare($type, $package, $path, $prevPackage);
+    }
+
+    /**
+     * @return PromiseInterface|null
+     */
+    public function cleanup($type, PackageInterface $package, $path, PackageInterface $prevPackage = null)
+    {
+        $this->cleanupExecuted[$package->getName()] = true;
+
+        return parent::cleanup($type, $package, $path, $prevPackage);
+    }
+
+    /**
+     * @inheritDoc
+     *
+     * @param bool $output
+     *
+     * @return PromiseInterface
+     *
      * @throws \RuntimeException
      * @throws \UnexpectedValueException
      */
@@ -115,8 +146,8 @@ abstract class ArchiveDownloader extends FileDownloader
              * that the source directory gets merged into the target one if the target exists. Otherwise rename() by default would
              * put the source into the target e.g. src/ => target/src/ (assuming target exists) instead of src/ => target/
              *
-             * @param string $from Directory
-             * @param string $to Directory
+             * @param  string $from Directory
+             * @param  string $to   Directory
              * @return void
              */
             $renameRecursively = function ($from, $to) use ($filesystem, $getFolderContent, $package, &$renameRecursively) {
@@ -137,8 +168,16 @@ abstract class ArchiveDownloader extends FileDownloader
             };
 
             $renameAsOne = false;
-            if (!file_exists($path) || ($filesystem->isDirEmpty($path) && $filesystem->removeDirectory($path))) {
+            if (!file_exists($path)) {
                 $renameAsOne = true;
+            } elseif ($filesystem->isDirEmpty($path)) {
+                try {
+                    if ($filesystem->removeDirectoryPhp($path)) {
+                        $renameAsOne = true;
+                    }
+                } catch (\RuntimeException $e) {
+                    // ignore error, and simply do not renameAsOne
+                }
             }
 
             $contentDir = $getFolderContent($temporaryDir);
@@ -176,7 +215,7 @@ abstract class ArchiveDownloader extends FileDownloader
     }
 
     /**
-     * {@inheritDoc}
+     * @inheritDoc
      */
     protected function getInstallOperationAppendix(PackageInterface $package, $path)
     {

@@ -13,11 +13,15 @@
 namespace Composer\Test;
 
 use Composer\Config;
+use Composer\Util\Platform;
 
 class ConfigTest extends TestCase
 {
     /**
      * @dataProvider dataAddPackagistRepository
+     * @param mixed[] $expected
+     * @param mixed[] $localConfig
+     * @param ?mixed[] $systemConfig
      */
     public function testAddPackagistRepository($expected, $localConfig, $systemConfig = null)
     {
@@ -265,7 +269,7 @@ class ConfigTest extends TestCase
     }
 
     /**
-     * @return array List of test URLs that should pass strict security
+     * @return string[][] List of test URLs that should pass strict security
      */
     public function allowedUrlProvider()
     {
@@ -286,7 +290,7 @@ class ConfigTest extends TestCase
     }
 
     /**
-     * @return array List of test URLs that should not pass strict security
+     * @return string[][] List of test URLs that should not pass strict security
      */
     public function prohibitedUrlProvider()
     {
@@ -324,17 +328,47 @@ class ConfigTest extends TestCase
 
     public function testProcessTimeout()
     {
-        putenv('COMPOSER_PROCESS_TIMEOUT=0');
+        Platform::putEnv('COMPOSER_PROCESS_TIMEOUT', '0');
         $config = new Config(true);
-        $this->assertEquals(0, $config->get('process-timeout'));
-        putenv('COMPOSER_PROCESS_TIMEOUT');
+        $result = $config->get('process-timeout');
+        Platform::clearEnv('COMPOSER_PROCESS_TIMEOUT');
+
+        $this->assertEquals(0, $result);
     }
 
     public function testHtaccessProtect()
     {
-        putenv('COMPOSER_HTACCESS_PROTECT=0');
+        Platform::putEnv('COMPOSER_HTACCESS_PROTECT', '0');
         $config = new Config(true);
-        $this->assertEquals(0, $config->get('htaccess-protect'));
-        putenv('COMPOSER_HTACCESS_PROTECT');
+        $result = $config->get('htaccess-protect');
+        Platform::clearEnv('COMPOSER_HTACCESS_PROTECT');
+
+        $this->assertEquals(0, $result);
+    }
+
+    public function testGetSourceOfValue()
+    {
+        Platform::clearEnv('COMPOSER_PROCESS_TIMEOUT');
+
+        $config = new Config;
+
+        $this->assertSame(Config::SOURCE_DEFAULT, $config->getSourceOfValue('process-timeout'));
+
+        $config->merge(
+            array('config' => array('process-timeout' => 1)),
+            'phpunit-test'
+        );
+
+        $this->assertSame('phpunit-test', $config->getSourceOfValue('process-timeout'));
+    }
+
+    public function testGetSourceOfValueEnvVariables()
+    {
+        Platform::putEnv('COMPOSER_HTACCESS_PROTECT', '0');
+        $config = new Config;
+        $result = $config->getSourceOfValue('htaccess-protect');
+        Platform::clearEnv('COMPOSER_HTACCESS_PROTECT');
+
+        $this->assertEquals('COMPOSER_HTACCESS_PROTECT', $result);
     }
 }
