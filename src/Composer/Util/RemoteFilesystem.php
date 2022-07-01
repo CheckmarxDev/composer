@@ -418,7 +418,7 @@ class RemoteFilesystem
             // JoaoD fix
             // return an empty json for the failed request
             return "{}";
-            
+
             // if (!$this->retry) {
             //     if ($this->progress && !$isRedirect) {
             //         $this->io->overwriteError("Downloading (<error>failed</error>)", false);

@@ -221,8 +221,6 @@ class JsonFile
         // $validator = new Validator();
         // $validator->check($data, $schemaData);
 
-        // // TODO add more validation like check version constraints and such, perhaps build that into the arrayloader?
-
         // if (!$validator->isValid()) {
         //     $errors = array();
         //     foreach ((array) $validator->getErrors() as $error) {

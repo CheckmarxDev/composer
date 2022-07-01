@@ -388,7 +388,7 @@ if (PHP_VERSION_ID < 80000) {
 STREAMPROXY;
             }
 
-                return $proxyCode . "\n" . <<<PROXY
+            return $proxyCode . "\n" . <<<PROXY
 <?php
 
 /**

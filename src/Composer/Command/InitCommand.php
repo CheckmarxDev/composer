@@ -194,17 +194,6 @@ EOT
             }
         }
 
-        // --autoload - Create src folder
-        if ($autoloadPath) {
-            $filesystem = new Filesystem();
-            $filesystem->ensureDirectoryExists($autoloadPath);
-
-            // dump-autoload only for projects without added dependencies.
-            if (!$this->hasDependencies($options)) {
-                $this->runDumpAutoloadCommand($output);
-            }
-        }
-
         if ($input->isInteractive() && is_dir('.git')) {
             $ignoreFile = realpath('.gitignore');
 

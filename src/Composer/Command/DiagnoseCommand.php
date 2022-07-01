@@ -597,9 +597,6 @@ EOT
         } elseif (XdebugHandler::isXdebugActive()) {
             $warnings['xdebug_loaded'] = true;
         }
-        // elseif (XdebugHandler::isXdebugActive()) {
-        //     $warnings['xdebug_loaded'] = true;
-        // }
 
         if (defined('PHP_WINDOWS_VERSION_BUILD')
             && (version_compare(PHP_VERSION, '7.2.23', '<')

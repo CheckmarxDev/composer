@@ -19,7 +19,6 @@ use Composer\Package\RootPackage;
 use Composer\Package\PackageInterface;
 use Composer\Package\CompletePackageInterface;
 use Composer\Package\Link;
-use Composer\Package\Package;
 use Composer\Package\RootAliasPackage;
 use Composer\Package\Version\VersionParser;
 use Composer\Pcre\Preg;
@@ -84,10 +83,6 @@ class ArrayLoader implements LoaderInterface
      */
     public function loadPackages(array $versions)
     {
-        if ($class !== 'Composer\Package\CompletePackage') {
-            trigger_error('The $class arg is deprecated, please reach out to Composer maintainers ASAP if you still need this.', E_USER_DEPRECATED);
-        }
-
         $packages = array();
         $linkCache = array();
 
