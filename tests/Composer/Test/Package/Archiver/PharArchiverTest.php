@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -13,35 +13,36 @@
 namespace Composer\Test\Package\Archiver;
 
 use Composer\Package\Archiver\PharArchiver;
+use Composer\Util\Platform;
 
-class PharArchiverTest extends ArchiverTest
+class PharArchiverTest extends ArchiverTestCase
 {
-    public function testTarArchive()
+    public function testTarArchive(): void
     {
         // Set up repository
         $this->setupDummyRepo();
         $package = $this->setupPackage();
-        $target = $this->getUniqueTmpDirectory().'/composer_archiver_test.tar';
+        $target = self::getUniqueTmpDirectory().'/composer_archiver_test.tar';
 
         // Test archive
         $archiver = new PharArchiver();
-        $archiver->archive($package->getSourceUrl(), $target, 'tar', array('foo/bar', 'baz', '!/foo/bar/baz'));
-        $this->assertFileExists($target);
+        $archiver->archive($package->getSourceUrl(), $target, 'tar', ['foo/bar', 'baz', '!/foo/bar/baz']);
+        self::assertFileExists($target);
 
         $this->filesystem->removeDirectory(dirname($target));
     }
 
-    public function testZipArchive()
+    public function testZipArchive(): void
     {
         // Set up repository
         $this->setupDummyRepo();
         $package = $this->setupPackage();
-        $target = $this->getUniqueTmpDirectory().'/composer_archiver_test.zip';
+        $target = self::getUniqueTmpDirectory().'/composer_archiver_test.zip';
 
         // Test archive
         $archiver = new PharArchiver();
         $archiver->archive($package->getSourceUrl(), $target, 'zip');
-        $this->assertFileExists($target);
+        self::assertFileExists($target);
 
         $this->filesystem->removeDirectory(dirname($target));
     }
@@ -51,9 +52,9 @@ class PharArchiverTest extends ArchiverTest
      *
      * @return void
      */
-    protected function setupDummyRepo()
+    protected function setupDummyRepo(): void
     {
-        $currentWorkDir = getcwd();
+        $currentWorkDir = Platform::getCwd();
         chdir($this->testDir);
 
         $this->writeFile('file.txt', 'content', $currentWorkDir);
@@ -65,14 +66,7 @@ class PharArchiverTest extends ArchiverTest
         chdir($currentWorkDir);
     }
 
-    /**
-     * @param string $path
-     * @param string $content
-     * @param string $currentWorkDir
-     *
-     * @return void
-     */
-    protected function writeFile($path, $content, $currentWorkDir)
+    protected function writeFile(string $path, string $content, string $currentWorkDir): void
     {
         if (!file_exists(dirname($path))) {
             mkdir(dirname($path), 0777, true);

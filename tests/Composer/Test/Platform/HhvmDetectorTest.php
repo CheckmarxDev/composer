@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -25,13 +25,13 @@ class HhvmDetectorTest extends TestCase
      */
     private $hhvmDetector;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         $this->hhvmDetector = new HhvmDetector();
         $this->hhvmDetector->reset();
     }
 
-    public function testHHVMVersionWhenExecutingInHHVM()
+    public function testHHVMVersionWhenExecutingInHHVM(): void
     {
         if (!defined('HHVM_VERSION_ID')) {
             self::markTestSkipped('Not running with HHVM');
@@ -40,13 +40,10 @@ class HhvmDetectorTest extends TestCase
         self::assertSame(self::versionIdToVersion(), $version);
     }
 
-    public function testHHVMVersionWhenExecutingInPHP()
+    public function testHHVMVersionWhenExecutingInPHP(): void
     {
         if (defined('HHVM_VERSION_ID')) {
             self::markTestSkipped('Running with HHVM');
-        }
-        if (PHP_VERSION_ID < 50400) {
-            self::markTestSkipped('Test only works on PHP 5.4+');
         }
         if (Platform::isWindows()) {
             self::markTestSkipped('Test does not run on Windows');
@@ -74,7 +71,7 @@ class HhvmDetectorTest extends TestCase
     /**
      * @return ?string
      */
-    private static function versionIdToVersion()
+    private static function versionIdToVersion(): ?string
     {
         if (!defined('HHVM_VERSION_ID')) {
             return null;

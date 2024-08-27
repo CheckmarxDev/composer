@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -12,13 +12,11 @@
 
 namespace Composer\Test\Repository\Vcs;
 
-use Composer\Downloader\TransportException;
 use Composer\Repository\Vcs\GitHubDriver;
 use Composer\Test\Mock\ProcessExecutorMock;
 use Composer\Test\TestCase;
 use Composer\Util\Filesystem;
 use Composer\Config;
-use Composer\Util\Http\Response;
 use Composer\Util\ProcessExecutor;
 
 class GitHubDriverTest extends TestCase
@@ -28,24 +26,25 @@ class GitHubDriverTest extends TestCase
     /** @var Config */
     private $config;
 
-    public function setUp()
+    public function setUp(): void
     {
-        $this->home = $this->getUniqueTmpDirectory();
+        $this->home = self::getUniqueTmpDirectory();
         $this->config = new Config();
-        $this->config->merge(array(
-            'config' => array(
+        $this->config->merge([
+            'config' => [
                 'home' => $this->home,
-            ),
-        ));
+            ],
+        ]);
     }
 
-    public function tearDown()
+    protected function tearDown(): void
     {
+        parent::tearDown();
         $fs = new Filesystem;
         $fs->removeDirectory($this->home);
     }
 
-    public function testPrivateRepository()
+    public function testPrivateRepository(): void
     {
         $repoUrl = 'http://github.com/composer/packagist';
         $repoApiUrl = 'https://api.github.com/repos/composer/packagist';
@@ -58,17 +57,18 @@ class GitHubDriverTest extends TestCase
             ->method('isInteractive')
             ->will($this->returnValue(true));
 
-        $httpDownloader = $this->getMockBuilder('Composer\Util\HttpDownloader')
-            ->setConstructorArgs(array($io, $this->config))
-            ->getMock();
+        $httpDownloader = $this->getHttpDownloaderMock($io, $this->config);
+        $httpDownloader->expects(
+            [
+                ['url' => $repoApiUrl, 'status' => 404],
+                ['url' => 'https://api.github.com/', 'body' => '{}'],
+                ['url' => $repoApiUrl, 'body' => '{"master_branch": "test_master", "private": true, "owner": {"login": "composer"}, "name": "packagist"}'],
+            ],
+            true
+        );
 
-        $process = new ProcessExecutorMock;
-        $process->expects(array(), false, array('return' => 1));
-
-        $httpDownloader->expects($this->at(0))
-            ->method('get')
-            ->with($this->equalTo($repoApiUrl))
-            ->will($this->throwException(new TransportException('HTTP/1.1 404 Not Found', 404)));
+        $process = $this->getProcessExecutorMock();
+        $process->expects([], false, ['return' => 1]);
 
         $io->expects($this->once())
             ->method('askAndHideAnswer')
@@ -79,43 +79,34 @@ class GitHubDriverTest extends TestCase
             ->method('setAuthentication')
             ->with($this->equalTo('github.com'), $this->matchesRegularExpression('{sometoken}'), $this->matchesRegularExpression('{x-oauth-basic}'));
 
-        $httpDownloader->expects($this->at(1))
-            ->method('get')
-            ->with($this->equalTo($url = 'https://api.github.com/'))
-            ->will($this->returnValue(new Response(array('url' => $url), 200, array(), '{}')));
-
-        $httpDownloader->expects($this->at(2))
-            ->method('get')
-            ->with($this->equalTo($url = $repoApiUrl))
-            ->will($this->returnValue(new Response(array('url' => $url), 200, array(), '{"master_branch": "test_master", "private": true, "owner": {"login": "composer"}, "name": "packagist"}')));
-
         $configSource = $this->getMockBuilder('Composer\Config\ConfigSourceInterface')->getMock();
         $authConfigSource = $this->getMockBuilder('Composer\Config\ConfigSourceInterface')->getMock();
         $this->config->setConfigSource($configSource);
         $this->config->setAuthConfigSource($authConfigSource);
 
-        $repoConfig = array(
+        $repoConfig = [
             'url' => $repoUrl,
-        );
+        ];
 
         $gitHubDriver = new GitHubDriver($repoConfig, $io, $this->config, $httpDownloader, $process);
         $gitHubDriver->initialize();
-        $this->setAttribute($gitHubDriver, 'tags', array($identifier => $sha));
+        $this->setAttribute($gitHubDriver, 'tags', [$identifier => $sha]);
 
-        $this->assertEquals('test_master', $gitHubDriver->getRootIdentifier());
+        self::assertEquals('test_master', $gitHubDriver->getRootIdentifier());
 
         $dist = $gitHubDriver->getDist($sha);
-        $this->assertEquals('zip', $dist['type']);
-        $this->assertEquals('https://api.github.com/repos/composer/packagist/zipball/SOMESHA', $dist['url']);
-        $this->assertEquals('SOMESHA', $dist['reference']);
+        self::assertIsArray($dist);
+        self::assertEquals('zip', $dist['type']);
+        self::assertEquals('https://api.github.com/repos/composer/packagist/zipball/SOMESHA', $dist['url']);
+        self::assertEquals('SOMESHA', $dist['reference']);
 
         $source = $gitHubDriver->getSource($sha);
-        $this->assertEquals('git', $source['type']);
-        $this->assertEquals($repoSshUrl, $source['url']);
-        $this->assertEquals('SOMESHA', $source['reference']);
+        self::assertEquals('git', $source['type']);
+        self::assertEquals($repoSshUrl, $source['url']);
+        self::assertEquals('SOMESHA', $source['reference']);
     }
 
-    public function testPublicRepository()
+    public function testPublicRepository(): void
     {
         $repoUrl = 'http://github.com/composer/packagist';
         $repoApiUrl = 'https://api.github.com/repos/composer/packagist';
@@ -127,38 +118,38 @@ class GitHubDriverTest extends TestCase
             ->method('isInteractive')
             ->will($this->returnValue(true));
 
-        $httpDownloader = $this->getMockBuilder('Composer\Util\HttpDownloader')
-            ->setConstructorArgs(array($io, $this->config))
-            ->getMock();
-
-        $httpDownloader->expects($this->at(0))
-            ->method('get')
-            ->with($this->equalTo($repoApiUrl))
-            ->will($this->returnValue(new Response(array('url' => $repoApiUrl), 200, array(), '{"master_branch": "test_master", "owner": {"login": "composer"}, "name": "packagist"}')));
-
-        $repoConfig = array(
-            'url' => $repoUrl,
+        $httpDownloader = $this->getHttpDownloaderMock($io, $this->config);
+        $httpDownloader->expects(
+            [
+                ['url' => $repoApiUrl, 'body' => '{"master_branch": "test_master", "owner": {"login": "composer"}, "name": "packagist"}'],
+            ],
+            true
         );
+
+        $repoConfig = [
+            'url' => $repoUrl,
+        ];
         $repoUrl = 'https://github.com/composer/packagist.git';
 
-        $gitHubDriver = new GitHubDriver($repoConfig, $io, $this->config, $httpDownloader, new ProcessExecutorMock);
+        $gitHubDriver = new GitHubDriver($repoConfig, $io, $this->config, $httpDownloader, $this->getProcessExecutorMock());
         $gitHubDriver->initialize();
-        $this->setAttribute($gitHubDriver, 'tags', array($identifier => $sha));
+        $this->setAttribute($gitHubDriver, 'tags', [$identifier => $sha]);
 
-        $this->assertEquals('test_master', $gitHubDriver->getRootIdentifier());
+        self::assertEquals('test_master', $gitHubDriver->getRootIdentifier());
 
         $dist = $gitHubDriver->getDist($sha);
-        $this->assertEquals('zip', $dist['type']);
-        $this->assertEquals('https://api.github.com/repos/composer/packagist/zipball/SOMESHA', $dist['url']);
-        $this->assertEquals($sha, $dist['reference']);
+        self::assertIsArray($dist);
+        self::assertEquals('zip', $dist['type']);
+        self::assertEquals('https://api.github.com/repos/composer/packagist/zipball/SOMESHA', $dist['url']);
+        self::assertEquals($sha, $dist['reference']);
 
         $source = $gitHubDriver->getSource($sha);
-        $this->assertEquals('git', $source['type']);
-        $this->assertEquals($repoUrl, $source['url']);
-        $this->assertEquals($sha, $source['reference']);
+        self::assertEquals('git', $source['type']);
+        self::assertEquals($repoUrl, $source['url']);
+        self::assertEquals($sha, $source['reference']);
     }
 
-    public function testPublicRepository2()
+    public function testPublicRepository2(): void
     {
         $repoUrl = 'http://github.com/composer/packagist';
         $repoApiUrl = 'https://api.github.com/repos/composer/packagist';
@@ -170,57 +161,84 @@ class GitHubDriverTest extends TestCase
             ->method('isInteractive')
             ->will($this->returnValue(true));
 
-        $httpDownloader = $this->getMockBuilder('Composer\Util\HttpDownloader')
-            ->setConstructorArgs(array($io, $this->config))
-            ->getMock();
-
-        $httpDownloader->expects($this->at(0))
-            ->method('get')
-            ->with($this->equalTo($url = $repoApiUrl))
-            ->will($this->returnValue(new Response(array('url' => $url), 200, array(), '{"master_branch": "test_master", "owner": {"login": "composer"}, "name": "packagist"}')));
-
-        $httpDownloader->expects($this->at(1))
-            ->method('get')
-            ->with($this->equalTo($url = 'https://api.github.com/repos/composer/packagist/contents/composer.json?ref=feature%2F3.2-foo'))
-            ->will($this->returnValue(new Response(array('url' => $url), 200, array(), '{"encoding":"base64","content":"'.base64_encode('{"support": {"source": "'.$repoUrl.'" }}').'"}')));
-
-        $httpDownloader->expects($this->at(2))
-            ->method('get')
-            ->with($this->equalTo($url = 'https://api.github.com/repos/composer/packagist/commits/feature%2F3.2-foo'))
-            ->will($this->returnValue(new Response(array('url' => $url), 200, array(), '{"commit": {"committer":{ "date": "2012-09-10"}}}')));
-
-        $httpDownloader->expects($this->at(3))
-            ->method('get')
-            ->with($this->equalTo($url = 'https://api.github.com/repos/composer/packagist/contents/.github/FUNDING.yml'))
-            ->will($this->returnValue(new Response(array('url' => $url), 200, array(), '{"encoding": "base64", "content": "'.base64_encode("custom: https://example.com").'"}')));
-
-        $repoConfig = array(
-            'url' => $repoUrl,
+        $httpDownloader = $this->getHttpDownloaderMock($io, $this->config);
+        $httpDownloader->expects(
+            [
+                ['url' => $repoApiUrl, 'body' => '{"master_branch": "test_master", "owner": {"login": "composer"}, "name": "packagist"}'],
+                ['url' => 'https://api.github.com/repos/composer/packagist/contents/composer.json?ref=feature%2F3.2-foo', 'body' => '{"encoding":"base64","content":"'.base64_encode('{"support": {"source": "'.$repoUrl.'" }}').'"}'],
+                ['url' => 'https://api.github.com/repos/composer/packagist/commits/feature%2F3.2-foo', 'body' => '{"commit": {"committer":{ "date": "2012-09-10"}}}'],
+                ['url' => 'https://api.github.com/repos/composer/packagist/contents/.github/FUNDING.yml', 'body' => '{"encoding": "base64", "content": "'.base64_encode("custom: https://example.com").'"}'],
+            ],
+            true
         );
+
+        $repoConfig = [
+            'url' => $repoUrl,
+        ];
         $repoUrl = 'https://github.com/composer/packagist.git';
 
-        $gitHubDriver = new GitHubDriver($repoConfig, $io, $this->config, $httpDownloader, new ProcessExecutorMock);
+        $gitHubDriver = new GitHubDriver($repoConfig, $io, $this->config, $httpDownloader, $this->getProcessExecutorMock());
         $gitHubDriver->initialize();
-        $this->setAttribute($gitHubDriver, 'tags', array($identifier => $sha));
+        $this->setAttribute($gitHubDriver, 'tags', [$identifier => $sha]);
 
-        $this->assertEquals('test_master', $gitHubDriver->getRootIdentifier());
+        self::assertEquals('test_master', $gitHubDriver->getRootIdentifier());
 
         $dist = $gitHubDriver->getDist($sha);
-        $this->assertEquals('zip', $dist['type']);
-        $this->assertEquals('https://api.github.com/repos/composer/packagist/zipball/SOMESHA', $dist['url']);
-        $this->assertEquals($sha, $dist['reference']);
+        self::assertIsArray($dist);
+        self::assertEquals('zip', $dist['type']);
+        self::assertEquals('https://api.github.com/repos/composer/packagist/zipball/SOMESHA', $dist['url']);
+        self::assertEquals($sha, $dist['reference']);
 
         $source = $gitHubDriver->getSource($sha);
-        $this->assertEquals('git', $source['type']);
-        $this->assertEquals($repoUrl, $source['url']);
-        $this->assertEquals($sha, $source['reference']);
+        self::assertEquals('git', $source['type']);
+        self::assertEquals($repoUrl, $source['url']);
+        self::assertEquals($sha, $source['reference']);
 
         $data = $gitHubDriver->getComposerInformation($identifier);
 
-        $this->assertArrayNotHasKey('abandoned', $data);
+        self::assertIsArray($data);
+        self::assertArrayNotHasKey('abandoned', $data);
     }
 
-    public function testPublicRepositoryArchived()
+    public function testInvalidSupportData(): void
+    {
+        $repoUrl = 'http://github.com/composer/packagist';
+        $repoApiUrl = 'https://api.github.com/repos/composer/packagist';
+        $identifier = 'feature/3.2-foo';
+        $sha = 'SOMESHA';
+
+        $io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
+        $io->expects($this->any())
+            ->method('isInteractive')
+            ->will($this->returnValue(true));
+
+        $httpDownloader = $this->getHttpDownloaderMock($io, $this->config);
+        $httpDownloader->expects(
+            [
+                ['url' => $repoApiUrl, 'body' => '{"master_branch": "test_master", "owner": {"login": "composer"}, "name": "packagist"}'],
+                ['url' => 'https://api.github.com/repos/composer/packagist/contents/composer.json?ref=feature%2F3.2-foo', 'body' => '{"encoding":"base64","content":"'.base64_encode('{"support": "'.$repoUrl.'" }').'"}'],
+                ['url' => 'https://api.github.com/repos/composer/packagist/commits/feature%2F3.2-foo', 'body' => '{"commit": {"committer":{ "date": "2012-09-10"}}}'],
+                ['url' => 'https://api.github.com/repos/composer/packagist/contents/.github/FUNDING.yml', 'body' => '{"encoding": "base64", "content": "'.base64_encode("custom: https://example.com").'"}'],
+            ],
+            true
+        );
+
+        $repoConfig = [
+            'url' => $repoUrl,
+        ];
+
+        $gitHubDriver = new GitHubDriver($repoConfig, $io, $this->config, $httpDownloader, $this->getProcessExecutorMock());
+        $gitHubDriver->initialize();
+        $this->setAttribute($gitHubDriver, 'tags', [$identifier => $sha]);
+        $this->setAttribute($gitHubDriver, 'branches', ['test_master' => $sha]);
+
+        $data = $gitHubDriver->getComposerInformation($identifier);
+
+        self::assertIsArray($data);
+        self::assertSame('https://github.com/composer/packagist/tree/feature/3.2-foo', $data['support']['source']);
+    }
+
+    public function testPublicRepositoryArchived(): void
     {
         $repoUrl = 'http://github.com/composer/packagist';
         $repoApiUrl = 'https://api.github.com/repos/composer/packagist';
@@ -233,44 +251,32 @@ class GitHubDriverTest extends TestCase
             ->method('isInteractive')
             ->will($this->returnValue(true));
 
-        $httpDownloader = $this->getMockBuilder('Composer\Util\HttpDownloader')
-            ->setConstructorArgs(array($io, $this->config))
-            ->getMock();
-
-        $httpDownloader->expects($this->at(0))
-            ->method('get')
-            ->with($this->equalTo($repoApiUrl))
-            ->will($this->returnValue(new Response(array('url' => $repoApiUrl), 200, array(), '{"master_branch": "test_master", "owner": {"login": "composer"}, "name": "packagist", "archived": true}')));
-
-        $httpDownloader->expects($this->at(1))
-            ->method('get')
-            ->with($this->equalTo($composerJsonUrl))
-            ->will($this->returnValue(new Response(array('url' => $composerJsonUrl), 200, array(), '{"encoding": "base64", "content": "' . base64_encode('{"name": "composer/packagist"}') . '"}')));
-
-        $httpDownloader->expects($this->at(2))
-            ->method('get')
-            ->with($this->equalTo($url = 'https://api.github.com/repos/composer/packagist/commits/'.$sha))
-            ->will($this->returnValue(new Response(array('url' => $url), 200, array(), '{"commit": {"committer":{ "date": "2012-09-10"}}}')));
-
-        $httpDownloader->expects($this->at(3))
-            ->method('get')
-            ->with($this->equalTo($url = 'https://api.github.com/repos/composer/packagist/contents/.github/FUNDING.yml'))
-            ->will($this->returnValue(new Response(array('url' => $url), 200, array(), '{"encoding": "base64", "content": "'.base64_encode("custom: https://example.com").'"}')));
-
-        $repoConfig = array(
-            'url' => $repoUrl,
+        $httpDownloader = $this->getHttpDownloaderMock($io, $this->config);
+        $httpDownloader->expects(
+            [
+                ['url' => $repoApiUrl, 'body' => '{"master_branch": "test_master", "owner": {"login": "composer"}, "name": "packagist", "archived": true}'],
+                ['url' => $composerJsonUrl, 'body' => '{"encoding": "base64", "content": "' . base64_encode('{"name": "composer/packagist"}') . '"}'],
+                ['url' => 'https://api.github.com/repos/composer/packagist/commits/'.$sha, 'body' => '{"commit": {"committer":{ "date": "2012-09-10"}}}'],
+                ['url' => 'https://api.github.com/repos/composer/packagist/contents/.github/FUNDING.yml', 'body' => '{"encoding": "base64", "content": "'.base64_encode("custom: https://example.com").'"}'],
+            ],
+            true
         );
 
-        $gitHubDriver = new GitHubDriver($repoConfig, $io, $this->config, $httpDownloader, new ProcessExecutorMock);
+        $repoConfig = [
+            'url' => $repoUrl,
+        ];
+
+        $gitHubDriver = new GitHubDriver($repoConfig, $io, $this->config, $httpDownloader, $this->getProcessExecutorMock());
         $gitHubDriver->initialize();
-        $this->setAttribute($gitHubDriver, 'tags', array($identifier => $sha));
+        $this->setAttribute($gitHubDriver, 'tags', [$identifier => $sha]);
 
         $data = $gitHubDriver->getComposerInformation($sha);
 
-        $this->assertTrue($data['abandoned']);
+        self::assertIsArray($data);
+        self::assertTrue($data['abandoned']);
     }
 
-    public function testPrivateRepositoryNoInteraction()
+    public function testPrivateRepositoryNoInteraction(): void
     {
         $repoUrl = 'http://github.com/composer/packagist';
         $repoApiUrl = 'https://api.github.com/repos/composer/packagist';
@@ -283,116 +289,152 @@ class GitHubDriverTest extends TestCase
             ->method('isInteractive')
             ->will($this->returnValue(false));
 
-        $httpDownloader = $this->getMockBuilder('Composer\Util\HttpDownloader')
-            ->setConstructorArgs(array($io, $this->config))
-            ->getMock();
-
-        $httpDownloader->expects($this->at(0))
-            ->method('get')
-            ->with($this->equalTo($repoApiUrl))
-            ->will($this->throwException(new TransportException('HTTP/1.1 404 Not Found', 404)));
+        $httpDownloader = $this->getHttpDownloaderMock($io, $this->config);
+        $httpDownloader->expects(
+            [
+                ['url' => $repoApiUrl, 'status' => 404],
+            ],
+            true
+        );
 
         // clean local clone if present
         $fs = new Filesystem();
         $fs->removeDirectory(sys_get_temp_dir() . '/composer-test');
+        $this->config->merge(['config' => ['cache-vcs-dir' => sys_get_temp_dir() . '/composer-test/cache']]);
 
-        $process = new ProcessExecutorMock;
-        $process->expects(array(
-            array('cmd' => 'git config github.accesstoken', 'return' => 1),
+        $process = $this->getProcessExecutorMock();
+        $process->expects([
+            ['cmd' => 'git config github.accesstoken', 'return' => 1],
             'git clone --mirror -- '.ProcessExecutor::escape($repoSshUrl).' '.ProcessExecutor::escape($this->config->get('cache-vcs-dir').'/git-github.com-composer-packagist.git/'),
-            array(
+            [
                 'cmd' => 'git show-ref --tags --dereference',
                 'stdout' => $sha.' refs/tags/'.$identifier,
-            ),
-            array(
+            ],
+            [
                 'cmd' => 'git branch --no-color --no-abbrev -v',
                 'stdout' => '  test_master     edf93f1fccaebd8764383dc12016d0a1a9672d89 Fix test & behavior',
-            ),
-            array(
+            ],
+            [
                 'cmd' => 'git branch --no-color',
                 'stdout' => '* test_master',
-            ),
-        ), true);
+            ],
+        ], true);
 
-        $repoConfig = array(
+        $repoConfig = [
             'url' => $repoUrl,
-        );
+        ];
 
         $gitHubDriver = new GitHubDriver($repoConfig, $io, $this->config, $httpDownloader, $process);
         $gitHubDriver->initialize();
 
-        $this->assertEquals('test_master', $gitHubDriver->getRootIdentifier());
+        self::assertEquals('test_master', $gitHubDriver->getRootIdentifier());
 
         $dist = $gitHubDriver->getDist($sha);
-        $this->assertEquals('zip', $dist['type']);
-        $this->assertEquals('https://api.github.com/repos/composer/packagist/zipball/SOMESHA', $dist['url']);
-        $this->assertEquals($sha, $dist['reference']);
+        self::assertIsArray($dist);
+        self::assertEquals('zip', $dist['type']);
+        self::assertEquals('https://api.github.com/repos/composer/packagist/zipball/SOMESHA', $dist['url']);
+        self::assertEquals($sha, $dist['reference']);
 
         $source = $gitHubDriver->getSource($identifier);
-        $this->assertEquals('git', $source['type']);
-        $this->assertEquals($repoSshUrl, $source['url']);
-        $this->assertEquals($identifier, $source['reference']);
+        self::assertEquals('git', $source['type']);
+        self::assertEquals($repoSshUrl, $source['url']);
+        self::assertEquals($identifier, $source['reference']);
 
         $source = $gitHubDriver->getSource($sha);
-        $this->assertEquals('git', $source['type']);
-        $this->assertEquals($repoSshUrl, $source['url']);
-        $this->assertEquals($sha, $source['reference']);
-
-        $process->assertComplete($this);
+        self::assertEquals('git', $source['type']);
+        self::assertEquals($repoSshUrl, $source['url']);
+        self::assertEquals($sha, $source['reference']);
     }
 
     /**
-     * @return void
+     * @dataProvider invalidUrlProvider
      */
-    public function initializeInvalidReoUrl()
+    public function testInitializeInvalidRepoUrl(string $url): void
     {
-        $this->setExpectedException('\InvalidArgumentException');
+        $this->expectException('\InvalidArgumentException');
 
-        $repoConfig = array(
-            'url' => 'https://github.com/acme',
-        );
+        $repoConfig = [
+            'url' => $url,
+        ];
 
         $io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
         $httpDownloader = $this->getMockBuilder('Composer\Util\HttpDownloader')
-            ->setConstructorArgs(array($io, $this->config))
+            ->setConstructorArgs([$io, $this->config])
             ->getMock();
 
-        $gitHubDriver = new GitHubDriver($repoConfig, $io, $this->config, $httpDownloader, new ProcessExecutorMock);
+        $gitHubDriver = new GitHubDriver($repoConfig, $io, $this->config, $httpDownloader, $this->getProcessExecutorMock());
         $gitHubDriver->initialize();
     }
 
     /**
-     * @dataProvider supportsProvider
-     * @param bool $expected
-     * @param string $repoUrl
+     * @return list<array{string}>
      */
-    public function testSupports($expected, $repoUrl)
+    public static function invalidUrlProvider()
+    {
+        return [
+            ['https://github.com/acme'],
+            ['https://github.com/acme/repository/releases'],
+            ['https://github.com/acme/repository/pulls'],
+        ];
+    }
+
+    /**
+     * @dataProvider supportsProvider
+     */
+    public function testSupports(bool $expected, string $repoUrl): void
     {
         $io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
 
-        $this->assertSame($expected, GitHubDriver::supports($io, $this->config, $repoUrl));
+        self::assertSame($expected, GitHubDriver::supports($io, $this->config, $repoUrl));
     }
 
     /**
      * @return list<array{bool, string}>
      */
-    public function supportsProvider()
+    public static function supportsProvider(): array
     {
-        return array(
-            array(false, 'https://github.com/acme'),
-            array(true, 'https://github.com/acme/repository'),
-            array(true, 'git@github.com:acme/repository.git'),
+        return [
+            [false, 'https://github.com/acme'],
+            [true, 'https://github.com/acme/repository'],
+            [true, 'git@github.com:acme/repository.git'],
+            [false, 'https://github.com/acme/repository/releases'],
+            [false, 'https://github.com/acme/repository/pulls'],
+        ];
+    }
+
+    public function testGetEmptyFileContent(): void
+    {
+        $repoUrl = 'http://github.com/composer/packagist';
+
+        $io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
+        $io->expects($this->any())
+            ->method('isInteractive')
+            ->will($this->returnValue(true));
+
+        $httpDownloader = $this->getHttpDownloaderMock($io, $this->config);
+        $httpDownloader->expects(
+            [
+                ['url' => 'https://api.github.com/repos/composer/packagist', 'body' => '{"master_branch": "test_master", "owner": {"login": "composer"}, "name": "packagist", "archived": true}'],
+                ['url' => 'https://api.github.com/repos/composer/packagist/contents/composer.json?ref=main', 'body' => '{"encoding":"base64","content":""}'],
+            ],
+            true
         );
+
+        $repoConfig = [
+            'url' => $repoUrl,
+        ];
+
+        $gitHubDriver = new GitHubDriver($repoConfig, $io, $this->config, $httpDownloader, $this->getProcessExecutorMock());
+        $gitHubDriver->initialize();
+
+        self::assertSame('', $gitHubDriver->getFileContent('composer.json', 'main'));
     }
 
     /**
      * @param string|object $object
-     * @param string        $attribute
      * @param mixed         $value
-     *
-     * @return void
      */
-    protected function setAttribute($object, $attribute, $value)
+    protected function setAttribute($object, string $attribute, $value): void
     {
         $attr = new \ReflectionProperty($object, $attribute);
         $attr->setAccessible(true);

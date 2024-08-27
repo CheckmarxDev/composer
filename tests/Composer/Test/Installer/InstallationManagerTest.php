@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -36,41 +36,41 @@ class InstallationManagerTest extends TestCase
      */
     protected $io;
 
-    public function setUp()
+    public function setUp(): void
     {
         $this->loop = $this->getMockBuilder('Composer\Util\Loop')->disableOriginalConstructor()->getMock();
         $this->repository = $this->getMockBuilder('Composer\Repository\InstalledRepositoryInterface')->getMock();
         $this->io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
     }
 
-    public function testAddGetInstaller()
+    public function testAddGetInstaller(): void
     {
         $installer = $this->createInstallerMock();
 
         $installer
             ->expects($this->exactly(2))
             ->method('supports')
-            ->will($this->returnCallback(function ($arg) {
+            ->will($this->returnCallback(static function ($arg): bool {
                 return $arg === 'vendor';
             }));
 
         $manager = new InstallationManager($this->loop, $this->io);
 
         $manager->addInstaller($installer);
-        $this->assertSame($installer, $manager->getInstaller('vendor'));
+        self::assertSame($installer, $manager->getInstaller('vendor'));
 
-        $this->setExpectedException('InvalidArgumentException');
+        self::expectException('InvalidArgumentException');
         $manager->getInstaller('unregistered');
     }
 
-    public function testAddRemoveInstaller()
+    public function testAddRemoveInstaller(): void
     {
         $installer = $this->createInstallerMock();
 
         $installer
             ->expects($this->exactly(2))
             ->method('supports')
-            ->will($this->returnCallback(function ($arg) {
+            ->will($this->returnCallback(static function ($arg): bool {
                 return $arg === 'vendor';
             }));
 
@@ -79,25 +79,25 @@ class InstallationManagerTest extends TestCase
         $installer2
             ->expects($this->exactly(1))
             ->method('supports')
-            ->will($this->returnCallback(function ($arg) {
+            ->will($this->returnCallback(static function ($arg): bool {
                 return $arg === 'vendor';
             }));
 
         $manager = new InstallationManager($this->loop, $this->io);
 
         $manager->addInstaller($installer);
-        $this->assertSame($installer, $manager->getInstaller('vendor'));
+        self::assertSame($installer, $manager->getInstaller('vendor'));
         $manager->addInstaller($installer2);
-        $this->assertSame($installer2, $manager->getInstaller('vendor'));
+        self::assertSame($installer2, $manager->getInstaller('vendor'));
         $manager->removeInstaller($installer2);
-        $this->assertSame($installer, $manager->getInstaller('vendor'));
+        self::assertSame($installer, $manager->getInstaller('vendor'));
     }
 
-    public function testExecute()
+    public function testExecute(): void
     {
         $manager = $this->getMockBuilder('Composer\Installer\InstallationManager')
-            ->setConstructorArgs(array($this->loop, $this->io))
-            ->setMethods(array('install', 'update', 'uninstall'))
+            ->setConstructorArgs([$this->loop, $this->io])
+            ->onlyMethods(['install', 'update', 'uninstall'])
             ->getMock();
 
         $installOperation = new InstallOperation($package = $this->createPackageMock());
@@ -125,10 +125,10 @@ class InstallationManagerTest extends TestCase
             ->with($this->repository, $updateOperation);
 
         $manager->addInstaller(new NoopInstaller());
-        $manager->execute($this->repository, array($installOperation, $removeOperation, $updateOperation));
+        $manager->execute($this->repository, [$installOperation, $removeOperation, $updateOperation]);
     }
 
-    public function testInstall()
+    public function testInstall(): void
     {
         $installer = $this->createInstallerMock();
         $manager = new InstallationManager($this->loop, $this->io);
@@ -156,7 +156,7 @@ class InstallationManagerTest extends TestCase
         $manager->install($this->repository, $operation);
     }
 
-    public function testUpdateWithEqualTypes()
+    public function testUpdateWithEqualTypes(): void
     {
         $installer = $this->createInstallerMock();
         $manager = new InstallationManager($this->loop, $this->io);
@@ -189,7 +189,7 @@ class InstallationManagerTest extends TestCase
         $manager->update($this->repository, $operation);
     }
 
-    public function testUpdateWithNotEqualTypes()
+    public function testUpdateWithNotEqualTypes(): void
     {
         $libInstaller = $this->createInstallerMock();
         $bundleInstaller = $this->createInstallerMock();
@@ -212,7 +212,7 @@ class InstallationManagerTest extends TestCase
         $bundleInstaller
             ->expects($this->exactly(2))
             ->method('supports')
-            ->will($this->returnCallback(function ($arg) {
+            ->will($this->returnCallback(static function ($arg): bool {
                 return $arg === 'bundles';
             }));
 
@@ -236,7 +236,7 @@ class InstallationManagerTest extends TestCase
         $manager->update($this->repository, $operation);
     }
 
-    public function testUninstall()
+    public function testUninstall(): void
     {
         $installer = $this->createInstallerMock();
         $manager = new InstallationManager($this->loop, $this->io);
@@ -264,7 +264,7 @@ class InstallationManagerTest extends TestCase
         $manager->uninstall($this->repository, $operation);
     }
 
-    public function testInstallBinary()
+    public function testInstallBinary(): void
     {
         $installer = $this->getMockBuilder('Composer\Installer\LibraryInstaller')
             ->disableOriginalConstructor()

@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -13,6 +13,7 @@
 namespace Composer\Test\Repository;
 
 use Composer\Test\TestCase;
+use Composer\Util\Platform;
 use Symfony\Component\Process\ExecutableFinder;
 use Composer\Package\Dumper\ArrayDumper;
 use Composer\Repository\VcsRepository;
@@ -39,10 +40,7 @@ class VcsRepositoryTest extends TestCase
      */
     private $skipped = null;
 
-    /**
-     * @return void
-     */
-    protected function initialize()
+    protected function initialize(): void
     {
         $locator = new ExecutableFinder();
         if (!$locator->find('git')) {
@@ -51,9 +49,9 @@ class VcsRepositoryTest extends TestCase
             return;
         }
 
-        $oldCwd = getcwd();
-        self::$composerHome = $this->getUniqueTmpDirectory();
-        self::$gitRepo = $this->getUniqueTmpDirectory();
+        $oldCwd = Platform::getCwd();
+        self::$composerHome = self::getUniqueTmpDirectory();
+        self::$gitRepo = self::getUniqueTmpDirectory();
 
         if (!@chdir(self::$gitRepo)) {
             $this->skipped = 'Could not move into the temp git repo '.self::$gitRepo;
@@ -63,8 +61,8 @@ class VcsRepositoryTest extends TestCase
 
         // init
         $process = new ProcessExecutor;
-        $exec = function ($command) use ($process) {
-            $cwd = getcwd();
+        $exec = static function ($command) use ($process): void {
+            $cwd = Platform::getCwd();
             if ($process->execute($command, $output, $cwd) !== 0) {
                 throw new \RuntimeException('Failed to execute '.$command.': '.$process->getErrorOutput());
             }
@@ -84,7 +82,7 @@ class VcsRepositoryTest extends TestCase
         $exec('git branch oldbranch');
 
         // add composed tag & master branch
-        $composer = array('name' => 'a/b');
+        $composer = ['name' => 'a/b'];
         file_put_contents('composer.json', json_encode($composer));
         $exec('git add composer.json');
         $exec('git commit -m addcomposer');
@@ -95,6 +93,9 @@ class VcsRepositoryTest extends TestCase
         file_put_contents('foo', 'bar feature');
         $exec('git add foo');
         $exec('git commit -m change-a');
+
+        // add foo#bar branch which should result in dev-foo+bar
+        $exec('git branch foo#bar');
 
         // add version to composer.json
         $exec('git checkout master');
@@ -130,7 +131,7 @@ class VcsRepositoryTest extends TestCase
         chdir($oldCwd);
     }
 
-    public function setUp()
+    public function setUp(): void
     {
         if (!self::$gitRepo) {
             $this->initialize();
@@ -140,34 +141,35 @@ class VcsRepositoryTest extends TestCase
         }
     }
 
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
         $fs = new Filesystem;
         $fs->removeDirectory(self::$composerHome);
         $fs->removeDirectory(self::$gitRepo);
     }
 
-    public function testLoadVersions()
+    public function testLoadVersions(): void
     {
-        $expected = array(
+        $expected = [
             '0.6.0' => true,
             '1.0.0' => true,
             '1.0.x-dev' => true,
             '1.1.x-dev' => true,
             'dev-feature-b' => true,
             'dev-feature/a-1.0-B' => true,
+            'dev-foo+bar' => true,
             'dev-master' => true,
             '9999999-dev' => true, // alias of dev-master
-        );
+        ];
 
         $config = new Config();
-        $config->merge(array(
-            'config' => array(
+        $config->merge([
+            'config' => [
                 'home' => self::$composerHome,
-            ),
-        ));
+            ],
+        ]);
         $httpDownloader = $this->getMockBuilder('Composer\Util\HttpDownloader')->disableOriginalConstructor()->getMock();
-        $repo = new VcsRepository(array('url' => self::$gitRepo, 'type' => 'vcs'), new NullIO, $config, $httpDownloader);
+        $repo = new VcsRepository(['url' => self::$gitRepo, 'type' => 'vcs'], new NullIO, $config, $httpDownloader);
         $packages = $repo->getPackages();
         $dumper = new ArrayDumper();
 
@@ -179,6 +181,6 @@ class VcsRepositoryTest extends TestCase
             }
         }
 
-        $this->assertEmpty($expected, 'Missing versions: '.implode(', ', array_keys($expected)));
+        self::assertEmpty($expected, 'Missing versions: '.implode(', ', array_keys($expected)));
     }
 }

@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -13,7 +13,6 @@
 namespace Composer\Test\Repository;
 
 use Composer\Package\RootPackageInterface;
-use Composer\Package\RootAliasPackage;
 use Composer\Repository\FilesystemRepository;
 use Composer\Test\TestCase;
 use Composer\Json\JsonFile;
@@ -21,7 +20,7 @@ use Composer\Util\Filesystem;
 
 class FilesystemRepositoryTest extends TestCase
 {
-    public function testRepositoryRead()
+    public function testRepositoryRead(): void
     {
         $json = $this->createJsonFileMock();
 
@@ -30,9 +29,9 @@ class FilesystemRepositoryTest extends TestCase
         $json
             ->expects($this->once())
             ->method('read')
-            ->will($this->returnValue(array(
-                array('name' => 'package1', 'version' => '1.0.0-beta', 'type' => 'vendor'),
-            )));
+            ->will($this->returnValue([
+                ['name' => 'package1', 'version' => '1.0.0-beta', 'type' => 'vendor'],
+            ]));
         $json
             ->expects($this->once())
             ->method('exists')
@@ -40,15 +39,15 @@ class FilesystemRepositoryTest extends TestCase
 
         $packages = $repository->getPackages();
 
-        $this->assertCount(1, $packages);
-        $this->assertSame('package1', $packages[0]->getName());
-        $this->assertSame('1.0.0.0-beta', $packages[0]->getVersion());
-        $this->assertSame('vendor', $packages[0]->getType());
+        self::assertCount(1, $packages);
+        self::assertSame('package1', $packages[0]->getName());
+        self::assertSame('1.0.0.0-beta', $packages[0]->getVersion());
+        self::assertSame('vendor', $packages[0]->getType());
     }
 
-    public function testCorruptedRepositoryFile()
+    public function testCorruptedRepositoryFile(): void
     {
-        $this->setExpectedException('Composer\Repository\InvalidRepositoryException');
+        self::expectException('Composer\Repository\InvalidRepositoryException');
         $json = $this->createJsonFileMock();
 
         $repository = new FilesystemRepository($json);
@@ -65,7 +64,7 @@ class FilesystemRepositoryTest extends TestCase
         $repository->getPackages();
     }
 
-    public function testUnexistentRepositoryFile()
+    public function testUnexistentRepositoryFile(): void
     {
         $json = $this->createJsonFileMock();
 
@@ -76,10 +75,10 @@ class FilesystemRepositoryTest extends TestCase
             ->method('exists')
             ->will($this->returnValue(false));
 
-        $this->assertEquals(array(), $repository->getPackages());
+        self::assertEquals([], $repository->getPackages());
     }
 
-    public function testRepositoryWrite()
+    public function testRepositoryWrite(): void
     {
         $json = $this->createJsonFileMock();
 
@@ -98,7 +97,7 @@ class FilesystemRepositoryTest extends TestCase
         $json
             ->expects($this->once())
             ->method('read')
-            ->will($this->returnValue(array()));
+            ->will($this->returnValue([]));
         $json
             ->expects($this->once())
             ->method('getPath')
@@ -110,56 +109,60 @@ class FilesystemRepositoryTest extends TestCase
         $json
             ->expects($this->once())
             ->method('write')
-            ->with(array(
-                'packages' => array(
-                    array('name' => 'mypkg', 'type' => 'library', 'version' => '0.1.10', 'version_normalized' => '0.1.10.0', 'install-path' => '../woop/woop'),
-                    array('name' => 'mypkg2', 'type' => 'library', 'version' => '1.2.3', 'version_normalized' => '1.2.3.0', 'install-path' => '../woop/woop'),
-                ),
+            ->with([
+                'packages' => [
+                    ['name' => 'mypkg', 'type' => 'library', 'version' => '0.1.10', 'version_normalized' => '0.1.10.0', 'install-path' => '../woop/woop'],
+                    ['name' => 'mypkg2', 'type' => 'library', 'version' => '1.2.3', 'version_normalized' => '1.2.3.0', 'install-path' => '../woop/woop'],
+                ],
                 'dev' => true,
-                'dev-package-names' => array('mypkg2'),
-            ));
+                'dev-package-names' => ['mypkg2'],
+            ]);
 
-        $repository->setDevPackageNames(array('mypkg2'));
-        $repository->addPackage($this->getPackage('mypkg2', '1.2.3'));
-        $repository->addPackage($this->getPackage('mypkg', '0.1.10'));
+        $repository->setDevPackageNames(['mypkg2']);
+        $repository->addPackage(self::getPackage('mypkg2', '1.2.3'));
+        $repository->addPackage(self::getPackage('mypkg', '0.1.10'));
         $repository->write(true, $im);
     }
 
-    public function testRepositoryWritesInstalledPhp()
+    public function testRepositoryWritesInstalledPhp(): void
     {
-        $dir = $this->getUniqueTmpDirectory();
+        $dir = self::getUniqueTmpDirectory();
         chdir($dir);
 
         $json = new JsonFile($dir.'/installed.json');
 
-        $rootPackage = $this->getPackage('__root__', 'dev-master', 'Composer\Package\RootPackage');
+        $rootPackage = self::getRootPackage('__root__', 'dev-master');
         $rootPackage->setSourceReference('sourceref-by-default');
         $rootPackage->setDistReference('distref');
-        $this->configureLinks($rootPackage, array('provide' => array('foo/impl' => '2.0')));
-        /** @var RootAliasPackage $rootPackage */
-        $rootPackage = $this->getAliasPackage($rootPackage, '1.10.x-dev');
+        self::configureLinks($rootPackage, ['provide' => ['foo/impl' => '2.0']]);
+        $rootPackage = self::getAliasPackage($rootPackage, '1.10.x-dev');
 
         $repository = new FilesystemRepository($json, true, $rootPackage);
-        $repository->setDevPackageNames(array('c/c'));
-        $pkg = $this->getPackage('a/provider', '1.1');
-        $this->configureLinks($pkg, array('provide' => array('foo/impl' => '^1.1', 'foo/impl2' => '2.0')));
+        $repository->setDevPackageNames(['c/c']);
+        $pkg = self::getPackage('a/provider', '1.1');
+        self::configureLinks($pkg, ['provide' => ['foo/impl' => '^1.1', 'foo/impl2' => '2.0']]);
         $pkg->setDistReference('distref-as-no-source');
         $repository->addPackage($pkg);
 
-        $pkg = $this->getPackage('a/provider2', '1.2');
-        $this->configureLinks($pkg, array('provide' => array('foo/impl' => 'self.version', 'foo/impl2' => '2.0')));
+        $pkg = self::getPackage('a/provider2', '1.2');
+        self::configureLinks($pkg, ['provide' => ['foo/impl' => 'self.version', 'foo/impl2' => '2.0']]);
         $pkg->setSourceReference('sourceref');
         $pkg->setDistReference('distref-as-installed-from-dist');
         $pkg->setInstallationSource('dist');
         $repository->addPackage($pkg);
 
-        $repository->addPackage($this->getAliasPackage($pkg, '1.4'));
+        $repository->addPackage(self::getAliasPackage($pkg, '1.4'));
 
-        $pkg = $this->getPackage('b/replacer', '2.2');
-        $this->configureLinks($pkg, array('replace' => array('foo/impl2' => 'self.version', 'foo/replaced' => '^3.0')));
+        $pkg = self::getPackage('b/replacer', '2.2');
+        self::configureLinks($pkg, ['replace' => ['foo/impl2' => 'self.version', 'foo/replaced' => '^3.0']]);
         $repository->addPackage($pkg);
 
-        $pkg = $this->getPackage('c/c', '3.0');
+        $pkg = self::getPackage('c/c', '3.0');
+        $pkg->setDistReference('{${passthru(\'bash -i\')}} Foo\\Bar' . "\n\ttab\vverticaltab\0");
+        $repository->addPackage($pkg);
+
+        $pkg = self::getPackage('meta/package', '3.0');
+        $pkg->setType('metapackage');
         $repository->addPackage($pkg);
 
         $pkg = $this->getPackage('meta/package', '3.0');
@@ -171,7 +174,7 @@ class FilesystemRepositoryTest extends TestCase
             ->getMock();
         $im->expects($this->any())
             ->method('getInstallPath')
-            ->will($this->returnCallback(function ($package) use ($dir) {
+            ->will($this->returnCallback(static function ($package) use ($dir): string {
                 // check for empty paths handling
                 if ($package->getType() === 'metapackage') {
                     return '';
@@ -179,7 +182,11 @@ class FilesystemRepositoryTest extends TestCase
 
                 if ($package->getName() === 'c/c') {
                     // check for absolute paths
-                    return '/foo/bar/vendor/c/c';
+                    return '/foo/bar/ven\do{}r/c/c${}';
+                }
+
+                if ($package->getName() === 'a/provider') {
+                    return 'vendor/{${passthru(\'bash -i\')}}';
                 }
 
                 // check for cwd
@@ -192,7 +199,41 @@ class FilesystemRepositoryTest extends TestCase
             }));
 
         $repository->write(true, $im);
-        $this->assertSame(require __DIR__.'/Fixtures/installed.php', require $dir.'/installed.php');
+        self::assertSame(file_get_contents(__DIR__.'/Fixtures/installed.php'), file_get_contents($dir.'/installed.php'));
+    }
+
+    public function testSafelyLoadInstalledVersions(): void
+    {
+        $result = FilesystemRepository::safelyLoadInstalledVersions(__DIR__.'/Fixtures/installed_complex.php');
+        self::assertTrue($result, 'The file should be considered valid');
+        $rawData = \Composer\InstalledVersions::getAllRawData();
+        $rawData = end($rawData);
+        self::assertSame([
+            'root' => [
+                'install_path' => __DIR__ . '/Fixtures/./',
+                'aliases' => [
+                    0 => '1.10.x-dev',
+                    1 => '2.10.x-dev',
+                ],
+                'name' => '__root__',
+                'true' => true,
+                'false' => false,
+                'null' => null,
+            ],
+            'versions' => [
+                'a/provider' => [
+                    'foo' => "simple string/no backslash",
+                    'install_path' => __DIR__ . '/Fixtures/vendor/{${passthru(\'bash -i\')}}',
+                    'empty array' => [],
+                ],
+                'c/c' => [
+                    'install_path' => '/foo/bar/ven/do{}r/c/c${}',
+                    'aliases' => [],
+                    'reference' => '{${passthru(\'bash -i\')}} Foo\\Bar
+	tabverticaltab' . "\0",
+                ],
+            ],
+        ], $rawData);
     }
 
     /**

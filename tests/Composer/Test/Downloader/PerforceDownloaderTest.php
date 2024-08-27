@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -18,8 +18,6 @@ use Composer\Repository\VcsRepository;
 use Composer\IO\IOInterface;
 use Composer\Test\TestCase;
 use Composer\Factory;
-use Composer\Util\Filesystem;
-use Composer\Test\Mock\ProcessExecutorMock;
 
 /**
  * @author Matt Whittom <Matt.Whittom@veteransunited.com>
@@ -43,28 +41,21 @@ class PerforceDownloaderTest extends TestCase
     /** @var string */
     protected $testPath;
 
-    protected function setUp()
+    protected function setUp(): void
     {
-        $this->testPath = $this->getUniqueTmpDirectory();
+        $this->testPath = self::getUniqueTmpDirectory();
         $this->repoConfig = $this->getRepoConfig();
         $this->config = $this->getConfig();
         $this->io = $this->getMockIoInterface();
-        $this->processExecutor = new ProcessExecutorMock;
+        $this->processExecutor = $this->getProcessExecutorMock();
         $this->repository = $this->getMockRepository($this->repoConfig, $this->io, $this->config);
         $this->package = $this->getMockPackageInterface($this->repository);
         $this->downloader = new PerforceDownloader($this->io, $this->config, $this->processExecutor);
     }
 
-    /**
-     * @return \Composer\Config
-     */
-    protected function getConfig()
+    protected function getConfig(array $configOptions = [], bool $useEnvironment = false): Config
     {
-        $config = new Config();
-        $settings = array('config' => array('home' => $this->testPath));
-        $config->merge($settings);
-
-        return $config;
+        return parent::getConfig(array_merge(['home' => $this->testPath], $configOptions), $useEnvironment);
     }
 
     /**
@@ -89,22 +80,20 @@ class PerforceDownloaderTest extends TestCase
     /**
      * @return string[]
      */
-    protected function getRepoConfig()
+    protected function getRepoConfig(): array
     {
-        return array('url' => 'TEST_URL', 'p4user' => 'TEST_USER');
+        return ['url' => 'TEST_URL', 'p4user' => 'TEST_USER'];
     }
 
     /**
      * @param string[] $repoConfig
-     * @param \Composer\IO\IOInterface $io
-     * @param \Composer\Config $config
      * @return \Composer\Repository\VcsRepository&\PHPUnit\Framework\MockObject\MockObject
      */
     protected function getMockRepository(array $repoConfig, IOInterface $io, Config $config)
     {
         $repository = $this->getMockBuilder('Composer\Repository\VcsRepository')
-            ->setMethods(array('getRepoConfig'))
-            ->setConstructorArgs(array($repoConfig, $io, $config, Factory::createHttpDownloader($io, $config)))
+            ->onlyMethods(['getRepoConfig'])
+            ->setConstructorArgs([$repoConfig, $io, $config, Factory::createHttpDownloader($io, $config)])
             ->getMock();
         $repository->expects($this->any())->method('getRepoConfig')->will($this->returnValue($repoConfig));
 
@@ -114,12 +103,12 @@ class PerforceDownloaderTest extends TestCase
     /**
      * @doesNotPerformAssertions
      */
-    public function testInitPerforceInstantiatesANewPerforceObject()
+    public function testInitPerforceInstantiatesANewPerforceObject(): void
     {
         $this->downloader->initPerforce($this->package, $this->testPath, 'SOURCE_REF');
     }
 
-    public function testInitPerforceDoesNothingIfPerforceAlreadySet()
+    public function testInitPerforceDoesNothingIfPerforceAlreadySet(): void
     {
         $perforce = $this->getMockBuilder('Composer\Util\Perforce')->disableOriginalConstructor()->getMock();
         $this->downloader->setPerforce($perforce);
@@ -131,22 +120,22 @@ class PerforceDownloaderTest extends TestCase
      * @depends testInitPerforceInstantiatesANewPerforceObject
      * @depends testInitPerforceDoesNothingIfPerforceAlreadySet
      */
-    public function testDoInstallWithTag()
+    public function testDoInstallWithTag(): void
     {
         //I really don't like this test but the logic of each Perforce method is tested in the Perforce class.  Really I am just enforcing workflow.
         $ref = 'SOURCE_REF@123';
         $label = 123;
         $this->package->expects($this->once())->method('getSourceReference')->will($this->returnValue($ref));
         $this->io->expects($this->once())->method('writeError')->with($this->stringContains('Cloning '.$ref));
-        $perforceMethods = array('setStream', 'p4Login', 'writeP4ClientSpec', 'connectClient', 'syncCodeBase', 'cleanupClientSpec');
+        $perforceMethods = ['setStream', 'p4Login', 'writeP4ClientSpec', 'connectClient', 'syncCodeBase', 'cleanupClientSpec'];
         $perforce = $this->getMockBuilder('Composer\Util\Perforce')->disableOriginalConstructor()->getMock();
-        $perforce->expects($this->at(0))->method('initializePath')->with($this->equalTo($this->testPath));
-        $perforce->expects($this->at(1))->method('setStream')->with($this->equalTo($ref));
-        $perforce->expects($this->at(2))->method('p4Login');
-        $perforce->expects($this->at(3))->method('writeP4ClientSpec');
-        $perforce->expects($this->at(4))->method('connectClient');
-        $perforce->expects($this->at(5))->method('syncCodeBase')->with($label);
-        $perforce->expects($this->at(6))->method('cleanupClientSpec');
+        $perforce->expects($this->once())->method('initializePath')->with($this->equalTo($this->testPath));
+        $perforce->expects($this->once())->method('setStream')->with($this->equalTo($ref));
+        $perforce->expects($this->once())->method('p4Login');
+        $perforce->expects($this->once())->method('writeP4ClientSpec');
+        $perforce->expects($this->once())->method('connectClient');
+        $perforce->expects($this->once())->method('syncCodeBase')->with($label);
+        $perforce->expects($this->once())->method('cleanupClientSpec');
         $this->downloader->setPerforce($perforce);
         $this->downloader->doInstall($this->package, $this->testPath, 'url');
     }
@@ -155,21 +144,21 @@ class PerforceDownloaderTest extends TestCase
      * @depends testInitPerforceInstantiatesANewPerforceObject
      * @depends testInitPerforceDoesNothingIfPerforceAlreadySet
      */
-    public function testDoInstallWithNoTag()
+    public function testDoInstallWithNoTag(): void
     {
         $ref = 'SOURCE_REF';
         $label = null;
         $this->package->expects($this->once())->method('getSourceReference')->will($this->returnValue($ref));
         $this->io->expects($this->once())->method('writeError')->with($this->stringContains('Cloning '.$ref));
-        $perforceMethods = array('setStream', 'p4Login', 'writeP4ClientSpec', 'connectClient', 'syncCodeBase', 'cleanupClientSpec');
+        $perforceMethods = ['setStream', 'p4Login', 'writeP4ClientSpec', 'connectClient', 'syncCodeBase', 'cleanupClientSpec'];
         $perforce = $this->getMockBuilder('Composer\Util\Perforce')->disableOriginalConstructor()->getMock();
-        $perforce->expects($this->at(0))->method('initializePath')->with($this->equalTo($this->testPath));
-        $perforce->expects($this->at(1))->method('setStream')->with($this->equalTo($ref));
-        $perforce->expects($this->at(2))->method('p4Login');
-        $perforce->expects($this->at(3))->method('writeP4ClientSpec');
-        $perforce->expects($this->at(4))->method('connectClient');
-        $perforce->expects($this->at(5))->method('syncCodeBase')->with($label);
-        $perforce->expects($this->at(6))->method('cleanupClientSpec');
+        $perforce->expects($this->once())->method('initializePath')->with($this->equalTo($this->testPath));
+        $perforce->expects($this->once())->method('setStream')->with($this->equalTo($ref));
+        $perforce->expects($this->once())->method('p4Login');
+        $perforce->expects($this->once())->method('writeP4ClientSpec');
+        $perforce->expects($this->once())->method('connectClient');
+        $perforce->expects($this->once())->method('syncCodeBase')->with($label);
+        $perforce->expects($this->once())->method('cleanupClientSpec');
         $this->downloader->setPerforce($perforce);
         $this->downloader->doInstall($this->package, $this->testPath, 'url');
     }

@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -28,30 +28,31 @@ class FossilDriverTest extends TestCase
      */
     protected $config;
 
-    public function setUp()
+    public function setUp(): void
     {
-        $this->home = $this->getUniqueTmpDirectory();
+        $this->home = self::getUniqueTmpDirectory();
         $this->config = new Config();
-        $this->config->merge(array(
-            'config' => array(
+        $this->config->merge([
+            'config' => [
                 'home' => $this->home,
-            ),
-        ));
+            ],
+        ]);
     }
 
-    public function tearDown()
+    protected function tearDown(): void
     {
+        parent::tearDown();
         $fs = new Filesystem();
         $fs->removeDirectory($this->home);
     }
 
-    public static function supportProvider()
+    public static function supportProvider(): array
     {
-        return array(
-            array('http://fossil.kd2.org/kd2fw/', true),
-            array('https://chiselapp.com/user/rkeene/repository/flint/index', true),
-            array('ssh://fossil.kd2.org/kd2fw.fossil', true),
-        );
+        return [
+            ['http://fossil.kd2.org/kd2fw/', true],
+            ['https://chiselapp.com/user/rkeene/repository/flint/index', true],
+            ['ssh://fossil.kd2.org/kd2fw.fossil', true],
+        ];
     }
 
     /**
@@ -60,10 +61,10 @@ class FossilDriverTest extends TestCase
      * @param string $url
      * @param bool   $assertion
      */
-    public function testSupport($url, $assertion)
+    public function testSupport(string $url, bool $assertion): void
     {
         $config = new Config();
         $result = FossilDriver::supports($this->getMockBuilder('Composer\IO\IOInterface')->getMock(), $config, $url);
-        $this->assertEquals($assertion, $result);
+        self::assertEquals($assertion, $result);
     }
 }

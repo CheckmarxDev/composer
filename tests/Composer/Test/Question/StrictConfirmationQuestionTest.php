@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -16,7 +16,6 @@ use Composer\Question\StrictConfirmationQuestion;
 use Composer\Test\TestCase;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\ArrayInput;
-use Symfony\Component\Console\Input\StreamableInputInterface;
 use Symfony\Component\Console\Output\StreamOutput;
 
 /**
@@ -31,26 +30,25 @@ class StrictConfirmationQuestionTest extends TestCase
      *
      * @phpstan-return list<array{non-empty-string}>
      */
-    public function getAskConfirmationBadData()
+    public static function getAskConfirmationBadData(): array
     {
-        return array(
-            array('not correct'),
-            array('no more'),
-            array('yes please'),
-            array('yellow'),
-        );
+        return [
+            ['not correct'],
+            ['no more'],
+            ['yes please'],
+            ['yellow'],
+        ];
     }
 
     /**
      * @dataProvider getAskConfirmationBadData
-     *
-     * @param string $answer
      */
-    public function testAskConfirmationBadAnswer($answer)
+    public function testAskConfirmationBadAnswer(string $answer): void
     {
-        list($input, $dialog) = $this->createInput($answer."\n");
+        [$input, $dialog] = $this->createInput($answer."\n");
 
-        $this->setExpectedException('InvalidArgumentException', 'Please answer yes, y, no, or n.');
+        self::expectException('InvalidArgumentException');
+        self::expectExceptionMessage('Please answer yes, y, no, or n.');
 
         $question = new StrictConfirmationQuestion('Do you like French fries?');
         $question->setMaxAttempts(1);
@@ -64,12 +62,12 @@ class StrictConfirmationQuestionTest extends TestCase
      * @param bool   $expected
      * @param bool   $default
      */
-    public function testAskConfirmation($question, $expected, $default = true)
+    public function testAskConfirmation(string $question, bool $expected, bool $default = true): void
     {
-        list($input, $dialog) = $this->createInput($question."\n");
+        [$input, $dialog] = $this->createInput($question."\n");
 
         $question = new StrictConfirmationQuestion('Do you like French fries?', $default);
-        $this->assertEquals($expected, $dialog->ask($input, $this->createOutputInterface(), $question), 'confirmation question should '.($expected ? 'pass' : 'cancel'));
+        self::assertEquals($expected, $dialog->ask($input, $this->createOutputInterface(), $question), 'confirmation question should '.($expected ? 'pass' : 'cancel'));
     }
 
     /**
@@ -77,38 +75,36 @@ class StrictConfirmationQuestionTest extends TestCase
      *
      * @phpstan-return list<array{string, bool}>|list<array{string, bool, bool}>
      */
-    public function getAskConfirmationData()
+    public static function getAskConfirmationData(): array
     {
-        return array(
-            array('', true),
-            array('', false, false),
-            array('y', true),
-            array('yes', true),
-            array('n', false),
-            array('no', false),
-        );
+        return [
+            ['', true],
+            ['', false, false],
+            ['y', true],
+            ['yes', true],
+            ['n', false],
+            ['no', false],
+        ];
     }
 
-    public function testAskConfirmationWithCustomTrueAndFalseAnswer()
+    public function testAskConfirmationWithCustomTrueAndFalseAnswer(): void
     {
         $question = new StrictConfirmationQuestion('Do you like French fries?', false, '/^ja$/i', '/^nein$/i');
 
-        list($input, $dialog) = $this->createInput("ja\n");
-        $this->assertTrue($dialog->ask($input, $this->createOutputInterface(), $question));
+        [$input, $dialog] = $this->createInput("ja\n");
+        self::assertTrue($dialog->ask($input, $this->createOutputInterface(), $question));
 
-        list($input, $dialog) = $this->createInput("nein\n");
-        $this->assertFalse($dialog->ask($input, $this->createOutputInterface(), $question));
+        [$input, $dialog] = $this->createInput("nein\n");
+        self::assertFalse($dialog->ask($input, $this->createOutputInterface(), $question));
     }
 
     /**
-     * @param string $input
-     *
      * @return resource
      */
-    protected function getInputStream($input)
+    protected function getInputStream(string $input)
     {
         $stream = fopen('php://memory', 'r+', false);
-        $this->assertNotFalse($stream);
+        self::assertNotFalse($stream);
 
         fwrite($stream, $input);
         rewind($stream);
@@ -116,34 +112,23 @@ class StrictConfirmationQuestionTest extends TestCase
         return $stream;
     }
 
-    /**
-     * @return StreamOutput
-     */
-    protected function createOutputInterface()
+    protected function createOutputInterface(): StreamOutput
     {
         return new StreamOutput(fopen('php://memory', 'r+', false));
     }
 
     /**
-     * @param string $entry
-     *
      * @return object[]
      *
      * @phpstan-return array{ArrayInput, QuestionHelper}
      */
-    protected function createInput($entry)
+    protected function createInput(string $entry): array
     {
-        $stream = $this->getInputStream($entry);
-        $input = new ArrayInput(array('--no-interaction'));
+        $input = new ArrayInput(['--no-interaction']);
+        $input->setStream($this->getInputStream($entry));
+
         $dialog = new QuestionHelper();
 
-        if (method_exists($dialog, 'setInputStream')) {
-            $dialog->setInputStream($stream);
-        }
-        if ($input instanceof StreamableInputInterface) {
-            $input->setStream($stream);
-        }
-
-        return array($input, $dialog);
+        return [$input, $dialog];
     }
 }

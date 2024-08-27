@@ -35,7 +35,7 @@ separated by `/`. Examples:
 * igorw/event-source
 
 The name must be lowercase and consist of words separated by `-`, `.` or `_`.
-The complete name should match `^[a-z0-9]([_.-]?[a-z0-9]+)*/[a-z0-9](([_.]?|-{0,2})[a-z0-9]+)*$`.
+The complete name should match `^[a-z0-9]([_.-]?[a-z0-9]+)*/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$`.
 
 The `name` property is required for published packages (libraries).
 
@@ -91,7 +91,7 @@ Out of the box, Composer supports four types:
 - **library:** This is the default. It will copy the files to `vendor`.
 - **project:** This denotes a project rather than a library. For example
   application shells like the [Symfony standard edition](https://github.com/symfony/symfony-standard),
-  CMSs like the [SilverStripe installer](https://github.com/silverstripe/silverstripe-installer)
+  CMSs like the [Silverstripe installer](https://github.com/silverstripe/silverstripe-installer)
   or full fledged applications distributed as packages. This can for example
   be used by IDEs to provide listings of projects to initialize when creating
   a new workspace.
@@ -102,6 +102,9 @@ Out of the box, Composer supports four types:
 - **composer-plugin:** A package of type `composer-plugin` may provide an
   installer for other packages that have a custom type. Read more in the
   [dedicated article](articles/custom-installers.md).
+- **php-ext** and **php-ext-zend**: These names are reserved for PHP extension
+  packages which are written in C. Do not use these types for packages written
+  in PHP.
 
 Only use a custom type if you need custom logic during installation. It is
 recommended to omit this field and have it default to `library`.
@@ -119,6 +122,15 @@ Examples:
 - redis
 - templating
 
+> **Note**: Some special keywords trigger `composer require` without the
+> `--dev` option to prompt users if they would like to add these packages to
+> `require-dev` instead of `require`. These are: `dev`, `testing`, `static analysis`.
+
+> **Note**: The range of characters allowed inside the string is restricted to
+> unicode letters or numbers, space `" "`, dot `.`, underscore `_` and dash `-`. (Regex: `'{^[\p{N}\p{L} ._-]+$}u'`)
+> Using other characters will emit a warning when running `composer validate` and
+> will cause the package to fail updating on Packagist.org.
+
 Optional.
 
 ### homepage
@@ -129,7 +141,9 @@ Optional.
 
 ### readme
 
-A relative path to the readme document.
+A relative path to the readme document. Defaults to `README.md`.
+
+This is mainly useful for packages not on GitHub, as for GitHub packages Packagist.org will use the readme API to fetch the one detected by GitHub.
 
 Optional.
 
@@ -178,8 +192,8 @@ An Example for disjunctive licenses:
 ```json
 {
     "license": [
-       "LGPL-2.1-only",
-       "GPL-3.0-or-later"
+        "LGPL-2.1-only",
+        "GPL-3.0-or-later"
     ]
 }
 ```
@@ -203,7 +217,7 @@ Each author object can have following properties:
 
 * **name:** The author's name. Usually their real name.
 * **email:** The author's email address.
-* **homepage:** An URL to the author's website.
+* **homepage:** URL to the author's website.
 * **role:** The author's role in the project (e.g. developer or translator)
 
 An example:
@@ -244,6 +258,7 @@ Support information includes the following:
 * **docs:** URL to the documentation.
 * **rss:** URL to the RSS feed.
 * **chat:** URL to the chat channel.
+* **security:** URL to the vulnerability disclosure policy (VDP).
 
 An example:
 
@@ -381,8 +396,8 @@ Example:
 
 ```json
 {
-    "require" : {
-        "php" : ">=7.4",
+    "require": {
+        "php": ">=7.4",
         "ext-mbstring": "*"
     }
 }
@@ -443,7 +458,7 @@ that exact version, and not any other version, which would be incorrect.
 
 Map of packages that are provided by this package. This is mostly
 useful for implementations of common interfaces. A package could depend on
-some virtual package e.g. `psr/logger-implementation`, any library that implements
+some virtual package e.g. `psr/log-implementation`, any library that implements
 this logger interface would list it in `provide`. Implementors can then
 be [found on Packagist.org](https://packagist.org/providers/psr/log-implementation).
 
@@ -646,6 +661,17 @@ Example:
 }
 ```
 
+Files autoload rules are included whenever `vendor/autoload.php` is included, right after
+the autoloader is registered. The order of inclusion depends on package dependencies so that
+if package A depends on B, files in package B will be included first to ensure package B is fully
+initialized and ready to be used when files from package A are included.
+
+If two packages have the same amount of dependents or no dependencies, the order is alphabetical.
+
+Files from the root package are always loaded last, and you cannot use files autoloading
+yourself to override functions from your dependencies. If you want to achieve that we recommend
+you include your own functions *before* including Composer's `vendor/autoload.php`.
+
 #### Exclude files from classmaps
 
 If you want to exclude some files or folders from the classmap you can use the `exclude-from-classmap` property.
@@ -846,16 +872,16 @@ override packages from it.
 Using JSON object notation is also possible. However, JSON key/value pairs
 are to be considered unordered so consistent behaviour cannot be guaranteed.
 
- ```json
+```json
 {
     "repositories": {
-         "foo": {
-             "type": "composer",
-             "url": "http://packages.foo.com"
-         }
+        "foo": {
+            "type": "composer",
+            "url": "http://packages.foo.com"
+        }
     }
 }
- ```
+```
 
 ### config <span>([root-only](04-schema.md#root-package))</span>
 
@@ -942,10 +968,27 @@ It can be boolean or a package name/URL pointing to a recommended alternative.
 Examples:
 
 Use `"abandoned": true` to indicate this package is abandoned.
-Use `"abandoned": "monolog/monolog"` to indicates this package is abandoned, and the
-recommended alternative is  `monolog/monolog`.
+Use `"abandoned": "monolog/monolog"` to indicate this package is abandoned, and that
+the recommended alternative is `monolog/monolog`.
 
 Defaults to false.
+
+Optional.
+
+### _comment
+
+Top level key used as a place to store comments (it can be a string or array of strings).
+
+```json
+{
+    "_comment": [
+        "The package foo/bar was required for business logic",
+        "Remove package foo/baz when removing foo/bar"
+    ]
+}
+```
+
+Defaults to empty.
 
 Optional.
 

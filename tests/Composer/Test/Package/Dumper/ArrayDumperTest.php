@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -23,240 +23,217 @@ class ArrayDumperTest extends TestCase
      * @var ArrayDumper
      */
     private $dumper;
-    /**
-     * @var \Composer\Package\CompletePackageInterface|\PHPUnit_Framework_MockObject_MockObject
-     */
-    private $package;
 
-    public function setUp()
+    public function setUp(): void
     {
         $this->dumper = new ArrayDumper();
-        $this->package = $this->getMockBuilder('Composer\Package\CompletePackageInterface')->getMock();
-        $this->packageExpects('getTransportOptions', array());
     }
 
-    public function testRequiredInformation()
+    public function testRequiredInformation(): void
     {
-        $this
-            ->packageExpects('getPrettyName', 'foo')
-            ->packageExpects('getPrettyVersion', '1.0')
-            ->packageExpects('getVersion', '1.0.0.0')
-        ;
-
-        $config = $this->dumper->dump($this->package);
-        $this->assertEquals(
-            array(
-                'name' => 'foo',
-                'version' => '1.0',
+        $config = $this->dumper->dump(self::getPackage());
+        self::assertEquals(
+            [
+                'name' => 'dummy/pkg',
+                'version' => '1.0.0',
                 'version_normalized' => '1.0.0.0',
-            ),
+                'type' => 'library',
+            ],
             $config
         );
     }
 
-    public function testRootPackage()
+    public function testRootPackage(): void
     {
-        $this->package = $this->getMockBuilder('Composer\Package\RootPackageInterface')->getMock();
+        $package = self::getRootPackage();
+        $package->setMinimumStability('dev');
 
-        $this
-            ->packageExpects('getMinimumStability', 'dev')
-            ->packageExpects('getTransportOptions', array())
-        ;
-
-        $config = $this->dumper->dump($this->package);
-        $this->assertSame('dev', $config['minimum-stability']);
+        $config = $this->dumper->dump($package);
+        self::assertSame('dev', $config['minimum-stability']);
     }
 
-    public function testDumpAbandoned()
+    public function testDumpAbandoned(): void
     {
-        $this->packageExpects('isAbandoned', true);
-        $this->packageExpects('getReplacementPackage', true);
+        $package = self::getPackage();
+        $package->setAbandoned(true);
+        $config = $this->dumper->dump($package);
 
-        $config = $this->dumper->dump($this->package);
-
-        $this->assertTrue($config['abandoned']);
+        self::assertTrue($config['abandoned']);
     }
 
-    public function testDumpAbandonedReplacement()
+    public function testDumpAbandonedReplacement(): void
     {
-        $this->packageExpects('isAbandoned', true);
-        $this->packageExpects('getReplacementPackage', 'foo/bar');
+        $package = self::getPackage();
+        $package->setAbandoned('foo/bar');
+        $config = $this->dumper->dump($package);
 
-        $config = $this->dumper->dump($this->package);
-
-        $this->assertSame('foo/bar', $config['abandoned']);
+        self::assertSame('foo/bar', $config['abandoned']);
     }
 
     /**
      * @dataProvider provideKeys
      *
-     * @param string $key
      * @param mixed  $value
      * @param string $method
      * @param mixed  $expectedValue
      */
-    public function testKeys($key, $value, $method = null, $expectedValue = null)
+    public function testKeys(string $key, $value, ?string $method = null, $expectedValue = null): void
     {
-        $this->package = $this->getMockBuilder('Composer\Package\RootPackageInterface')->getMock();
+        $package = self::getRootPackage();
 
-        $this->packageExpects('get'.ucfirst($method ?: $key), $value);
-        $this->packageExpects('isAbandoned', $value);
+        // @phpstan-ignore method.dynamicName
+        $package->{'set'.ucfirst($method ?? $key)}($value);
 
-        if ($method !== 'transportOptions') {
-            $this->packageExpects('getTransportOptions', array());
-        }
+        $config = $this->dumper->dump($package);
 
-        $config = $this->dumper->dump($this->package);
-
-        $this->assertSame($expectedValue ?: $value, $config[$key]);
+        self::assertSame($expectedValue ?: $value, $config[$key]);
     }
 
-    public function provideKeys()
+    public static function provideKeys(): array
     {
-        return array(
-            array(
+        return [
+            [
                 'type',
                 'library',
-            ),
-            array(
+            ],
+            [
                 'time',
                 $datetime = new \DateTime('2012-02-01'),
                 'ReleaseDate',
                 $datetime->format(DATE_RFC3339),
-            ),
-            array(
+            ],
+            [
                 'authors',
-                array('Nils Adermann <naderman@naderman.de>', 'Jordi Boggiano <j.boggiano@seld.be>'),
-            ),
-            array(
+                ['Nils Adermann <naderman@naderman.de>', 'Jordi Boggiano <j.boggiano@seld.be>'],
+            ],
+            [
                 'homepage',
                 'https://getcomposer.org',
-            ),
-            array(
+            ],
+            [
                 'description',
                 'Dependency Manager',
-            ),
-            array(
+            ],
+            [
                 'keywords',
-                array('package', 'dependency', 'autoload'),
+                ['package', 'dependency', 'autoload'],
                 null,
-                array('autoload', 'dependency', 'package'),
-            ),
-            array(
+                ['autoload', 'dependency', 'package'],
+            ],
+            [
                 'bin',
-                array('bin/composer'),
+                ['bin/composer'],
                 'binaries',
-            ),
-            array(
+            ],
+            [
                 'license',
-                array('MIT'),
-            ),
-            array(
+                ['MIT'],
+            ],
+            [
                 'autoload',
-                array('psr-0' => array('Composer' => 'src/')),
-            ),
-            array(
+                ['psr-0' => ['Composer' => 'src/']],
+            ],
+            [
                 'repositories',
-                array('packagist' => false),
-            ),
-            array(
+                ['packagist' => false],
+            ],
+            [
                 'scripts',
-                array('post-update-cmd' => 'MyVendor\\MyClass::postUpdate'),
-            ),
-            array(
+                ['post-update-cmd' => 'MyVendor\\MyClass::postUpdate'],
+            ],
+            [
                 'extra',
-                array('class' => 'MyVendor\\Installer'),
-            ),
-            array(
+                ['class' => 'MyVendor\\Installer'],
+            ],
+            [
                 'archive',
-                array('/foo/bar', 'baz', '!/foo/bar/baz'),
+                ['/foo/bar', 'baz', '!/foo/bar/baz'],
                 'archiveExcludes',
-                array(
-                    'exclude' => array('/foo/bar', 'baz', '!/foo/bar/baz'),
-                ),
-            ),
-            array(
+                [
+                    'exclude' => ['/foo/bar', 'baz', '!/foo/bar/baz'],
+                ],
+            ],
+            [
                 'require',
-                array(new Link('foo', 'foo/bar', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0')),
+                ['foo/bar' => new Link('dummy/pkg', 'foo/bar', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0')],
                 'requires',
-                array('foo/bar' => '1.0.0'),
-            ),
-            array(
+                ['foo/bar' => '1.0.0'],
+            ],
+            [
                 'require-dev',
-                array(new Link('foo', 'foo/bar', new Constraint('=', '1.0.0.0'), Link::TYPE_DEV_REQUIRE, '1.0.0')),
+                ['foo/bar' => new Link('dummy/pkg', 'foo/bar', new Constraint('=', '1.0.0.0'), Link::TYPE_DEV_REQUIRE, '1.0.0')],
                 'devRequires',
-                array('foo/bar' => '1.0.0'),
-            ),
-            array(
+                ['foo/bar' => '1.0.0'],
+            ],
+            [
                 'suggest',
-                array('foo/bar' => 'very useful package'),
+                ['foo/bar' => 'very useful package'],
                 'suggests',
-            ),
-            array(
+            ],
+            [
                 'support',
-                array('foo' => 'bar'),
-            ),
-            array(
+                ['foo' => 'bar'],
+            ],
+            [
                 'funding',
-                array('type' => 'foo', 'url' => 'https://example.com'),
-            ),
-            array(
+                ['type' => 'foo', 'url' => 'https://example.com'],
+            ],
+            [
                 'require',
-                array(new Link('foo', 'foo/bar', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'), new Link('bar', 'bar/baz', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0')),
+                [
+                    'foo/bar' => new Link('dummy/pkg', 'foo/bar', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'),
+                    'bar/baz' => new Link('dummy/pkg', 'bar/baz', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'),
+                ],
                 'requires',
-                array('bar/baz' => '1.0.0', 'foo/bar' => '1.0.0'),
-            ),
-            array(
+                ['bar/baz' => '1.0.0', 'foo/bar' => '1.0.0'],
+            ],
+            [
                 'require-dev',
-                array(new Link('foo', 'foo/bar', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'), new Link('bar', 'bar/baz', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0')),
+                [
+                    'foo/bar' => new Link('dummy/pkg', 'foo/bar', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'),
+                    'bar/baz' => new Link('dummy/pkg', 'bar/baz', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'),
+                ],
                 'devRequires',
-                array('bar/baz' => '1.0.0', 'foo/bar' => '1.0.0'),
-            ),
-            array(
+                ['bar/baz' => '1.0.0', 'foo/bar' => '1.0.0'],
+            ],
+            [
                 'suggest',
-                array('foo/bar' => 'very useful package', 'bar/baz' => 'another useful package'),
+                ['foo/bar' => 'very useful package', 'bar/baz' => 'another useful package'],
                 'suggests',
-                array('bar/baz' => 'another useful package', 'foo/bar' => 'very useful package'),
-            ),
-            array(
+                ['bar/baz' => 'another useful package', 'foo/bar' => 'very useful package'],
+            ],
+            [
                 'provide',
-                array(new Link('foo', 'foo/bar', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'), new Link('bar', 'bar/baz', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0')),
+                [
+                    'foo/bar' => new Link('dummy/pkg', 'foo/bar', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'),
+                    'bar/baz' => new Link('dummy/pkg', 'bar/baz', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'),
+                ],
                 'provides',
-                array('bar/baz' => '1.0.0', 'foo/bar' => '1.0.0'),
-            ),
-            array(
+                ['bar/baz' => '1.0.0', 'foo/bar' => '1.0.0'],
+            ],
+            [
                 'replace',
-                array(new Link('foo', 'foo/bar', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'), new Link('bar', 'bar/baz', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0')),
+                [
+                    'foo/bar' => new Link('dummy/pkg', 'foo/bar', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'),
+                    'bar/baz' => new Link('dummy/pkg', 'bar/baz', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'),
+                ],
                 'replaces',
-                array('bar/baz' => '1.0.0', 'foo/bar' => '1.0.0'),
-            ),
-            array(
+                ['bar/baz' => '1.0.0', 'foo/bar' => '1.0.0'],
+            ],
+            [
                 'conflict',
-                array(new Link('foo', 'foo/bar', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'), new Link('bar', 'bar/baz', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0')),
+                [
+                    'foo/bar' => new Link('dummy/pkg', 'foo/bar', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'),
+                    'bar/baz' => new Link('dummy/pkg', 'bar/baz', new Constraint('=', '1.0.0.0'), Link::TYPE_REQUIRE, '1.0.0'),
+                ],
                 'conflicts',
-                array('bar/baz' => '1.0.0', 'foo/bar' => '1.0.0'),
-            ),
-            array(
+                ['bar/baz' => '1.0.0', 'foo/bar' => '1.0.0'],
+            ],
+            [
                 'transport-options',
-                array('ssl' => array('local_cert' => '/opt/certs/test.pem')),
+                ['ssl' => ['local_cert' => '/opt/certs/test.pem']],
                 'transportOptions',
-            ),
-        );
-    }
-
-    /**
-     * @param string $method
-     * @param mixed  $value
-     *
-     * @return self
-     */
-    private function packageExpects($method, $value)
-    {
-        $this->package
-            ->expects($this->any())
-            ->method($method)
-            ->will($this->returnValue($value));
-
-        return $this;
+            ],
+        ];
     }
 }

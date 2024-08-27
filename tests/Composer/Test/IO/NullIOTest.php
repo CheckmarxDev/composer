@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -17,63 +17,63 @@ use Composer\Test\TestCase;
 
 class NullIOTest extends TestCase
 {
-    public function testIsInteractive()
+    public function testIsInteractive(): void
     {
         $io = new NullIO();
 
-        $this->assertFalse($io->isInteractive());
+        self::assertFalse($io->isInteractive());
     }
 
-    public function testhasAuthentication()
+    public function testHasAuthentication(): void
     {
         $io = new NullIO();
 
-        $this->assertFalse($io->hasAuthentication('foo'));
+        self::assertFalse($io->hasAuthentication('foo'));
     }
 
-    public function testAskAndHideAnswer()
+    public function testAskAndHideAnswer(): void
     {
         $io = new NullIO();
 
-        $this->assertNull($io->askAndHideAnswer('foo'));
+        self::assertNull($io->askAndHideAnswer('foo'));
     }
 
-    public function testgetAuthentications()
+    public function testGetAuthentications(): void
     {
         $io = new NullIO();
 
-        $this->assertTrue(is_array($io->getAuthentications())); // @phpstan-ignore-line
-        $this->assertEmpty($io->getAuthentications());
-        $this->assertEquals(array('username' => null, 'password' => null), $io->getAuthentication('foo'));
+        self::assertIsArray($io->getAuthentications());
+        self::assertEmpty($io->getAuthentications());
+        self::assertEquals(['username' => null, 'password' => null], $io->getAuthentication('foo'));
     }
 
-    public function testAsk()
+    public function testAsk(): void
     {
         $io = new NullIO();
 
-        $this->assertEquals('foo', $io->ask('bar', 'foo'));
+        self::assertEquals('foo', $io->ask('bar', 'foo'));
     }
 
-    public function testAskConfirmation()
+    public function testAskConfirmation(): void
     {
         $io = new NullIO();
 
-        $this->assertEquals(false, $io->askConfirmation('bar', false));
+        self::assertFalse($io->askConfirmation('bar', false));
     }
 
-    public function testAskAndValidate()
+    public function testAskAndValidate(): void
     {
         $io = new NullIO();
 
-        $this->assertEquals('foo', $io->askAndValidate('question', function ($x) {
+        self::assertEquals('foo', $io->askAndValidate('question', static function ($x): bool {
             return true;
         }, null, 'foo'));
     }
 
-    public function testSelect()
+    public function testSelect(): void
     {
         $io = new NullIO();
 
-        $this->assertEquals('1', $io->select('question', array('item1', 'item2'), '1', 2, 'foo', true));
+        self::assertEquals('1', $io->select('question', ['item1', 'item2'], '1', 2, 'foo', true));
     }
 }

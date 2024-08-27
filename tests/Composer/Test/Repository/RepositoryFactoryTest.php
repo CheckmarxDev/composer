@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -17,7 +17,7 @@ use Composer\Test\TestCase;
 
 class RepositoryFactoryTest extends TestCase
 {
-    public function testManagerWithAllRepositoryTypes()
+    public function testManagerWithAllRepositoryTypes(): void
     {
         $manager = RepositoryFactory::manager(
             $this->getMockBuilder('Composer\IO\IOInterface')->getMock(),
@@ -30,7 +30,7 @@ class RepositoryFactoryTest extends TestCase
         $ref->setAccessible(true);
         $repositoryClasses = $ref->getValue($manager);
 
-        $this->assertEquals(array(
+        self::assertEquals([
             'composer',
             'vcs',
             'package',
@@ -46,7 +46,7 @@ class RepositoryFactoryTest extends TestCase
             'hg',
             'artifact',
             'path',
-        ), array_keys($repositoryClasses));
+        ], array_keys($repositoryClasses));
     }
 
     /**
@@ -55,24 +55,23 @@ class RepositoryFactoryTest extends TestCase
      * @param int|string            $index
      * @param array<string, string> $config
      * @param array<string, mixed>  $existingRepos
-     * @param int|string            $expected
      *
      * @phpstan-param array{url?: string} $config
      */
-    public function testGenerateRepositoryName($index, array $config, array $existingRepos, $expected)
+    public function testGenerateRepositoryName($index, array $config, array $existingRepos, string $expected): void
     {
-        $this->assertSame($expected, RepositoryFactory::generateRepositoryName($index, $config, $existingRepos));
+        self::assertSame($expected, RepositoryFactory::generateRepositoryName($index, $config, $existingRepos));
     }
 
-    public function generateRepositoryNameProvider()
+    public static function generateRepositoryNameProvider(): array
     {
-        return array(
-            array(0, array(), array(), 0),
-            array(0, array(), array(array()), '02'),
-            array(0, array('url' => 'https://example.org'), array(), 'example.org'),
-            array(0, array('url' => 'https://example.org'), array('example.org' => array()), 'example.org2'),
-            array('example.org', array('url' => 'https://example.org/repository'), array(), 'example.org'),
-            array('example.org', array('url' => 'https://example.org/repository'), array('example.org' => array()), 'example.org2'),
-        );
+        return [
+            [0, [], [], '0'],
+            [0, [], [[]], '02'],
+            [0, ['url' => 'https://example.org'], [], 'example.org'],
+            [0, ['url' => 'https://example.org'], ['example.org' => []], 'example.org2'],
+            ['example.org', ['url' => 'https://example.org/repository'], [], 'example.org'],
+            ['example.org', ['url' => 'https://example.org/repository'], ['example.org' => []], 'example.org2'],
+        ];
     }
 }

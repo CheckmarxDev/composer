@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -18,9 +18,10 @@ use Composer\Package\Archiver\ArchiveManager;
 use Composer\Package\CompletePackage;
 use Composer\Util\Loop;
 use Composer\Test\Mock\FactoryMock;
+use Composer\Util\Platform;
 use Composer\Util\ProcessExecutor;
 
-class ArchiveManagerTest extends ArchiverTest
+class ArchiveManagerTest extends ArchiverTestCase
 {
     /**
      * @var ArchiveManager
@@ -32,7 +33,7 @@ class ArchiveManagerTest extends ArchiverTest
      */
     protected $targetDir;
 
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
 
@@ -48,16 +49,16 @@ class ArchiveManagerTest extends ArchiverTest
         $this->targetDir = $this->testDir.'/composer_archiver_tests';
     }
 
-    public function testUnknownFormat()
+    public function testUnknownFormat(): void
     {
-        $this->setExpectedException('RuntimeException');
+        self::expectException('RuntimeException');
 
         $package = $this->setupPackage();
 
         $this->manager->archive($package, '__unknown_format__', $this->targetDir);
     }
 
-    public function testArchiveTar()
+    public function testArchiveTar(): void
     {
         $this->skipIfNotExecutable('git');
 
@@ -68,15 +69,15 @@ class ArchiveManagerTest extends ArchiverTest
         $this->manager->archive($package, 'tar', $this->targetDir);
 
         $target = $this->getTargetName($package, 'tar');
-        $this->assertFileExists($target);
+        self::assertFileExists($target);
 
         $tmppath = sys_get_temp_dir().'/composer_archiver/'.$this->manager->getPackageFilename($package);
-        $this->assertFileDoesNotExist($tmppath);
+        self::assertFileDoesNotExist($tmppath);
 
         unlink($target);
     }
 
-    public function testArchiveCustomFileName()
+    public function testArchiveCustomFileName(): void
     {
         $this->skipIfNotExecutable('git');
 
@@ -90,21 +91,39 @@ class ArchiveManagerTest extends ArchiverTest
 
         $target = $this->targetDir . '/' . $fileName . '.tar';
 
-        $this->assertFileExists($target);
+        self::assertFileExists($target);
 
         $tmppath = sys_get_temp_dir().'/composer_archiver/'.$this->manager->getPackageFilename($package);
-        $this->assertFileDoesNotExist($tmppath);
+        self::assertFileDoesNotExist($tmppath);
 
         unlink($target);
     }
 
-    /**
-     * @param string      $format
-     * @param string|null $fileName
-     *
-     * @return string
-     */
-    protected function getTargetName(CompletePackage $package, $format, $fileName = null)
+    public function testGetPackageFilenameParts(): void
+    {
+        $expected = [
+            'base' => 'archivertest-archivertest',
+            'version' => 'master',
+            'source_reference' => '4f26ae',
+        ];
+        $package = $this->setupPackage();
+
+        self::assertSame(
+            $expected,
+            $this->manager->getPackageFilenameParts($package)
+        );
+    }
+
+    public function testGetPackageFilename(): void
+    {
+        $package = $this->setupPackage();
+        self::assertSame(
+            'archivertest-archivertest-master-4f26ae',
+            $this->manager->getPackageFilename($package)
+        );
+    }
+
+    protected function getTargetName(CompletePackage $package, string $format, ?string $fileName = null): string
     {
         if (null === $fileName) {
             $packageName = $this->manager->getPackageFilename($package);
@@ -120,9 +139,9 @@ class ArchiveManagerTest extends ArchiverTest
      *
      * @return void
      */
-    protected function setupGitRepo()
+    protected function setupGitRepo(): void
     {
-        $currentWorkDir = getcwd();
+        $currentWorkDir = Platform::getCwd();
         chdir($this->testDir);
 
         $output = null;

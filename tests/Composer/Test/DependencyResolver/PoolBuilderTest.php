@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -30,13 +30,12 @@ use Composer\Package\Version\VersionParser;
 use Composer\Repository\RepositoryFactory;
 use Composer\Repository\RepositorySet;
 use Composer\Test\TestCase;
+use Composer\Util\Platform;
 
 class PoolBuilderTest extends TestCase
 {
     /**
      * @dataProvider getIntegrationTests
-     * @param string $file
-     * @param string $message
      * @param string[] $expect
      * @param string[] $expectOptimized
      * @param mixed[] $root
@@ -44,14 +43,17 @@ class PoolBuilderTest extends TestCase
      * @param mixed[] $packageRepos
      * @param mixed[] $fixed
      */
-    public function testPoolBuilder($file, $message, $expect, $expectOptimized, $root, $requestData, $packageRepos, $fixed)
+    public function testPoolBuilder(string $file, string $message, array $expect, array $expectOptimized, array $root, array $requestData, array $packageRepos, array $fixed): void
     {
-        $rootAliases = !empty($root['aliases']) ? $root['aliases'] : array();
+        $rootAliases = !empty($root['aliases']) ? $root['aliases'] : [];
         $minimumStability = !empty($root['minimum-stability']) ? $root['minimum-stability'] : 'stable';
-        $stabilityFlags = !empty($root['stability-flags']) ? $root['stability-flags'] : array();
-        $rootReferences = !empty($root['references']) ? $root['references'] : array();
-        $stabilityFlags = array_map(function ($stability) {
-            return BasePackage::$stabilities[$stability];
+        $stabilityFlags = !empty($root['stability-flags']) ? $root['stability-flags'] : [];
+        $rootReferences = !empty($root['references']) ? $root['references'] : [];
+        $stabilityFlags = array_map(static function ($stability): int {
+            if (!isset(BasePackage::STABILITIES[$stability])) {
+                throw new \LogicException('Invalid stability given: '.$stability);
+            }
+            return BasePackage::STABILITIES[$stability];
         }, $stabilityFlags);
 
         $parser = new VersionParser();
@@ -61,8 +63,8 @@ class PoolBuilderTest extends TestCase
         }
 
         $loader = new ArrayLoader(null, true);
-        $packageIds = array();
-        $loadPackage = function ($data) use ($loader, &$packageIds) {
+        $packageIds = [];
+        $loadPackage = static function ($data) use ($loader, &$packageIds): \Composer\Package\PackageInterface {
             /** @var ?int $id */
             $id = null;
             if (!empty($data['id'])) {
@@ -82,13 +84,15 @@ class PoolBuilderTest extends TestCase
             return $pkg;
         };
 
-        $oldCwd = getcwd();
+        $oldCwd = Platform::getCwd();
         chdir(__DIR__.'/Fixtures/poolbuilder/');
 
         $repositorySet = new RepositorySet($minimumStability, $stabilityFlags, $rootAliases, $rootReferences);
+        $config = new Config(false);
+        $rm = RepositoryFactory::manager($io = new NullIO(), $config);
         foreach ($packageRepos as $packages) {
             if (isset($packages['type'])) {
-                $repo = RepositoryFactory::createRepo(new NullIO, new Config(false), $packages);
+                $repo = RepositoryFactory::createRepo($io, $config, $packages, $rm);
                 $repositorySet->addRepository($repo);
                 continue;
             }
@@ -125,7 +129,7 @@ class PoolBuilderTest extends TestCase
             if (isset($requestData['allowTransitiveDeps']) && $requestData['allowTransitiveDeps']) {
                 $transitiveDeps = Request::UPDATE_LISTED_WITH_TRANSITIVE_DEPS;
             }
-            $request->setUpdateAllowList(array_flip($requestData['allowList']), $transitiveDeps);
+            $request->setUpdateAllowList($requestData['allowList'], $transitiveDeps);
         }
 
         foreach ($fixed as $fixedPackage) {
@@ -136,27 +140,31 @@ class PoolBuilderTest extends TestCase
 
         $result = $this->getPackageResultSet($pool, $packageIds);
 
-        $this->assertSame($expect, $result, 'Unoptimized pool does not match expected package set');
+        sort($expect);
+        sort($result);
+        self::assertSame($expect, $result, 'Unoptimized pool does not match expected package set');
 
         $optimizer = new PoolOptimizer(new DefaultPolicy());
         $result = $this->getPackageResultSet($optimizer->optimize($request, $pool), $packageIds);
-        $this->assertSame($expectOptimized, $result, 'Optimized pool does not match expected package set');
+        sort($expectOptimized);
+        sort($result);
+        self::assertSame($expectOptimized, $result, 'Optimized pool does not match expected package set');
 
         chdir($oldCwd);
     }
 
     /**
      * @param array<int, BasePackage> $packageIds
-     * @return string[]
+     * @return list<string|int>
      */
-    private function getPackageResultSet(Pool $pool, $packageIds)
+    private function getPackageResultSet(Pool $pool, array $packageIds): array
     {
-        $result = array();
+        $result = [];
         for ($i = 1, $count = count($pool); $i <= $count; $i++) {
             $result[] = $pool->packageById($i);
         }
 
-        return array_map(function (BasePackage $package) use ($packageIds) {
+        return array_map(static function (BasePackage $package) use ($packageIds) {
             if ($id = array_search($package, $packageIds, true)) {
                 return $id;
             }
@@ -184,25 +192,27 @@ class PoolBuilderTest extends TestCase
     /**
      * @return array<string, array<string>>
      */
-    public function getIntegrationTests()
+    public static function getIntegrationTests(): array
     {
-        $fixturesDir = realpath(__DIR__.'/Fixtures/poolbuilder/');
-        $tests = array();
+        $fixturesDir = (string) realpath(__DIR__.'/Fixtures/poolbuilder/');
+        $tests = [];
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($fixturesDir), \RecursiveIteratorIterator::LEAVES_ONLY) as $file) {
+            $file = (string) $file;
+
             if (!Preg::isMatch('/\.test$/', $file)) {
                 continue;
             }
 
             try {
-                $testData = $this->readTestFile($file, $fixturesDir);
+                $testData = self::readTestFile($file, $fixturesDir);
 
                 $message = $testData['TEST'];
 
                 $request = JsonFile::parseJson($testData['REQUEST']);
-                $root = !empty($testData['ROOT']) ? JsonFile::parseJson($testData['ROOT']) : array();
+                $root = !empty($testData['ROOT']) ? JsonFile::parseJson($testData['ROOT']) : [];
 
                 $packageRepos = JsonFile::parseJson($testData['PACKAGE-REPOS']);
-                $fixed = array();
+                $fixed = [];
                 if (!empty($testData['FIXED'])) {
                     $fixed = JsonFile::parseJson($testData['FIXED']);
                 }
@@ -212,22 +222,20 @@ class PoolBuilderTest extends TestCase
                 die(sprintf('Test "%s" is not valid: '.$e->getMessage(), str_replace($fixturesDir.'/', '', $file)));
             }
 
-            $tests[basename($file)] = array(str_replace($fixturesDir.'/', '', $file), $message, $expect, $expectOptimized, $root, $request, $packageRepos, $fixed);
+            $tests[basename($file)] = [str_replace($fixturesDir.'/', '', $file), $message, $expect, $expectOptimized, $root, $request, $packageRepos, $fixed];
         }
 
         return $tests;
     }
 
     /**
-     * @param \SplFileInfo $file
-     * @param string $fixturesDir
      * @return array<string, string>
      */
-    protected function readTestFile(\SplFileInfo $file, $fixturesDir)
+    protected static function readTestFile(string $file, string $fixturesDir): array
     {
-        $tokens = Preg::split('#(?:^|\n*)--([A-Z-]+)--\n#', file_get_contents($file->getRealPath()), -1, PREG_SPLIT_DELIM_CAPTURE);
+        $tokens = Preg::split('#(?:^|\n*)--([A-Z-]+)--\n#', file_get_contents($file), -1, PREG_SPLIT_DELIM_CAPTURE);
 
-        $sectionInfo = array(
+        $sectionInfo = [
             'TEST' => true,
             'ROOT' => false,
             'REQUEST' => true,
@@ -235,10 +243,10 @@ class PoolBuilderTest extends TestCase
             'PACKAGE-REPOS' => true,
             'EXPECT' => true,
             'EXPECT-OPTIMIZED' => false,
-        );
+        ];
 
         $section = null;
-        $data = array();
+        $data = [];
         foreach ($tokens as $i => $token) {
             if (null === $section && empty($token)) {
                 continue; // skip leading blank

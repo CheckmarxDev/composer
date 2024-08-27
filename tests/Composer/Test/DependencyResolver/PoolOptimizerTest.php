@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -32,9 +32,8 @@ class PoolOptimizerTest extends TestCase
      * @param mixed[] $requestData
      * @param BasePackage[] $packagesBefore
      * @param BasePackage[] $expectedPackages
-     * @param string $message
      */
-    public function testPoolOptimizer(array $requestData, array $packagesBefore, array $expectedPackages, $message)
+    public function testPoolOptimizer(array $requestData, array $packagesBefore, array $expectedPackages, string $message): void
     {
         $lockedRepo = new LockArrayRepository();
 
@@ -43,12 +42,12 @@ class PoolOptimizerTest extends TestCase
 
         if (isset($requestData['locked'])) {
             foreach ($requestData['locked'] as $package) {
-                $request->lockPackage($this->loadPackage($package));
+                $request->lockPackage(self::loadPackage($package));
             }
         }
         if (isset($requestData['fixed'])) {
             foreach ($requestData['fixed'] as $package) {
-                $request->fixPackage($this->loadPackage($package));
+                $request->fixPackage(self::loadPackage($package));
             }
         }
 
@@ -56,65 +55,65 @@ class PoolOptimizerTest extends TestCase
             $request->requireName($package, $parser->parseConstraints($constraint));
         }
 
-        $preferStable = isset($requestData['preferStable']) ? $requestData['preferStable'] : false;
-        $preferLowest = isset($requestData['preferLowest']) ? $requestData['preferLowest'] : false;
+        $preferStable = $requestData['preferStable'] ?? false;
+        $preferLowest = $requestData['preferLowest'] ?? false;
 
         $pool = new Pool($packagesBefore);
         $poolOptimizer = new PoolOptimizer(new DefaultPolicy($preferStable, $preferLowest));
 
         $pool = $poolOptimizer->optimize($request, $pool);
 
-        $this->assertSame(
+        self::assertSame(
             $this->reducePackagesInfoForComparison($expectedPackages),
             $this->reducePackagesInfoForComparison($pool->getPackages()),
             $message
         );
     }
 
-    public function provideIntegrationTests()
+    public static function provideIntegrationTests(): array
     {
-        $fixturesDir = realpath(__DIR__.'/Fixtures/pooloptimizer/');
-        $tests = array();
+        $fixturesDir = (string) realpath(__DIR__.'/Fixtures/pooloptimizer/');
+        $tests = [];
         foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($fixturesDir), \RecursiveIteratorIterator::LEAVES_ONLY) as $file) {
+            $file = (string) $file;
+
             if (!Preg::isMatch('/\.test$/', $file)) {
                 continue;
             }
 
             try {
-                $testData = $this->readTestFile($file, $fixturesDir);
+                $testData = self::readTestFile($file, $fixturesDir);
                 $message = $testData['TEST'];
                 $requestData = JsonFile::parseJson($testData['REQUEST']);
-                $packagesBefore = $this->loadPackages(JsonFile::parseJson($testData['POOL-BEFORE']));
-                $expectedPackages = $this->loadPackages(JsonFile::parseJson($testData['POOL-AFTER']));
-
+                $packagesBefore = self::loadPackages(JsonFile::parseJson($testData['POOL-BEFORE']));
+                $expectedPackages = self::loadPackages(JsonFile::parseJson($testData['POOL-AFTER']));
             } catch (\Exception $e) {
                 die(sprintf('Test "%s" is not valid: '.$e->getMessage(), str_replace($fixturesDir.'/', '', $file)));
             }
 
-            $tests[basename($file)] = array($requestData, $packagesBefore, $expectedPackages, $message);
+            $tests[basename($file)] = [$requestData, $packagesBefore, $expectedPackages, $message];
         }
 
         return $tests;
     }
 
     /**
-     * @param  string $fixturesDir
      * @return mixed[]
      */
-    protected function readTestFile(\SplFileInfo $file, $fixturesDir)
+    protected static function readTestFile(string $file, string $fixturesDir): array
     {
-        $tokens = Preg::split('#(?:^|\n*)--([A-Z-]+)--\n#', file_get_contents($file->getRealPath()), -1, PREG_SPLIT_DELIM_CAPTURE);
+        $tokens = Preg::split('#(?:^|\n*)--([A-Z-]+)--\n#', file_get_contents($file), -1, PREG_SPLIT_DELIM_CAPTURE);
 
         /** @var array<string, bool> $sectionInfo */
-        $sectionInfo = array(
+        $sectionInfo = [
             'TEST' => true,
             'REQUEST' => true,
             'POOL-BEFORE' => true,
             'POOL-AFTER' => true,
-        );
+        ];
 
         $section = null;
-        $data = array();
+        $data = [];
         foreach ($tokens as $i => $token) {
             if (null === $section && empty($token)) {
                 continue; // skip leading blank
@@ -155,9 +154,9 @@ class PoolOptimizerTest extends TestCase
      * @param BasePackage[] $packages
      * @return string[]
      */
-    private function reducePackagesInfoForComparison(array $packages)
+    private function reducePackagesInfoForComparison(array $packages): array
     {
-        $packagesInfo = array();
+        $packagesInfo = [];
 
         foreach ($packages as $package) {
             $packagesInfo[] = $package->getName() . '@' . $package->getVersion() . ($package instanceof AliasPackage ? ' (alias of '.$package->getAliasOf()->getVersion().')' : '');
@@ -172,12 +171,12 @@ class PoolOptimizerTest extends TestCase
      * @param mixed[][] $packagesData
      * @return BasePackage[]
      */
-    private function loadPackages(array $packagesData)
+    private static function loadPackages(array $packagesData): array
     {
-        $packages = array();
+        $packages = [];
 
         foreach ($packagesData as $packageData) {
-            $packages[] = $package = $this->loadPackage($packageData);
+            $packages[] = $package = self::loadPackage($packageData);
             if ($package instanceof AliasPackage) {
                 $packages[] = $package->getAliasOf();
             }
@@ -188,11 +187,11 @@ class PoolOptimizerTest extends TestCase
 
     /**
      * @param mixed[] $packageData
-     * @return BasePackage
      */
-    private function loadPackage(array $packageData)
+    private static function loadPackage(array $packageData): BasePackage
     {
         $loader = new ArrayLoader();
+
         return $loader->load($packageData);
     }
 }

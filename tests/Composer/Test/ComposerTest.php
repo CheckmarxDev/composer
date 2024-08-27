@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -16,49 +16,49 @@ use Composer\Composer;
 
 class ComposerTest extends TestCase
 {
-    public function testSetGetPackage()
+    public function testSetGetPackage(): void
     {
         $composer = new Composer();
         $package = $this->getMockBuilder('Composer\Package\RootPackageInterface')->getMock();
         $composer->setPackage($package);
 
-        $this->assertSame($package, $composer->getPackage());
+        self::assertSame($package, $composer->getPackage());
     }
 
-    public function testSetGetLocker()
+    public function testSetGetLocker(): void
     {
         $composer = new Composer();
         $locker = $this->getMockBuilder('Composer\Package\Locker')->disableOriginalConstructor()->getMock();
         $composer->setLocker($locker);
 
-        $this->assertSame($locker, $composer->getLocker());
+        self::assertSame($locker, $composer->getLocker());
     }
 
-    public function testSetGetRepositoryManager()
+    public function testSetGetRepositoryManager(): void
     {
         $composer = new Composer();
         $manager = $this->getMockBuilder('Composer\Repository\RepositoryManager')->disableOriginalConstructor()->getMock();
         $composer->setRepositoryManager($manager);
 
-        $this->assertSame($manager, $composer->getRepositoryManager());
+        self::assertSame($manager, $composer->getRepositoryManager());
     }
 
-    public function testSetGetDownloadManager()
+    public function testSetGetDownloadManager(): void
     {
         $composer = new Composer();
         $io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
-        $manager = $this->getMockBuilder('Composer\Downloader\DownloadManager')->setConstructorArgs(array($io))->getMock();
+        $manager = $this->getMockBuilder('Composer\Downloader\DownloadManager')->setConstructorArgs([$io])->getMock();
         $composer->setDownloadManager($manager);
 
-        $this->assertSame($manager, $composer->getDownloadManager());
+        self::assertSame($manager, $composer->getDownloadManager());
     }
 
-    public function testSetGetInstallationManager()
+    public function testSetGetInstallationManager(): void
     {
         $composer = new Composer();
         $manager = $this->getMockBuilder('Composer\Installer\InstallationManager')->disableOriginalConstructor()->getMock();
         $composer->setInstallationManager($manager);
 
-        $this->assertSame($manager, $composer->getInstallationManager());
+        self::assertSame($manager, $composer->getInstallationManager());
     }
 }

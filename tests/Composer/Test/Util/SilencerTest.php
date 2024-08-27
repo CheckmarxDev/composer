@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -25,7 +25,7 @@ class SilencerTest extends TestCase
     /**
      * Test succeeds when no warnings are emitted externally, and original level is restored.
      */
-    public function testSilencer()
+    public function testSilencer(): void
     {
         $before = error_reporting();
 
@@ -35,25 +35,26 @@ class SilencerTest extends TestCase
         Silencer::restore();
 
         // Check all parameters and return values are passed correctly in a silenced call.
-        $result = Silencer::call(function ($a, $b, $c) {
+        $result = Silencer::call(static function ($a, $b, $c) {
             @trigger_error('Test', E_USER_WARNING);
 
             return $a * $b * $c;
         }, 2, 3, 4);
-        $this->assertEquals(24, $result);
+        self::assertEquals(24, $result);
 
         // Check the error reporting setting was restored correctly
-        $this->assertEquals($before, error_reporting());
+        self::assertEquals($before, error_reporting());
     }
 
     /**
      * Test whether exception from silent callbacks are correctly forwarded.
      */
-    public function testSilencedException()
+    public function testSilencedException(): void
     {
         $verification = microtime();
-        $this->setExpectedException('\RuntimeException', $verification);
-        Silencer::call(function () use ($verification) {
+        self::expectException('RuntimeException');
+        self::expectExceptionMessage($verification);
+        Silencer::call(static function () use ($verification): void {
             throw new \RuntimeException($verification);
         });
     }

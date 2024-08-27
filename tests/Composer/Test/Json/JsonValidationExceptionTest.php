@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -19,27 +19,27 @@ class JsonValidationExceptionTest extends TestCase
 {
     /**
      * @dataProvider errorProvider
-     * @param string|null $message
-     * @param string[]|null $errors
+     * @param string[] $errors
+     * @param string[] $expectedErrors
      */
-    public function testGetErrors($message, $errors)
+    public function testGetErrors(string $message, array $errors, string $expectedMessage, array $expectedErrors): void
     {
         $object = new JsonValidationException($message, $errors);
-        $this->assertEquals($message, $object->getMessage());
-        $this->assertEquals($errors, $object->getErrors());
+        self::assertSame($expectedMessage, $object->getMessage());
+        self::assertSame($expectedErrors, $object->getErrors());
     }
 
-    public function testGetErrorsWhenNoErrorsProvided()
+    public function testGetErrorsWhenNoErrorsProvided(): void
     {
         $object = new JsonValidationException('test message');
-        $this->assertEquals(array(), $object->getErrors());
+        self::assertEquals([], $object->getErrors());
     }
 
-    public function errorProvider()
+    public static function errorProvider(): array
     {
-        return array(
-            array('test message', array()),
-            array(null, null),
-        );
+        return [
+            ['test message', [], 'test message', []],
+            ['', ['foo'], '', ['foo']],
+        ];
     }
 }

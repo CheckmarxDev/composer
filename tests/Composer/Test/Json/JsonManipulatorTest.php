@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -12,6 +12,7 @@
 
 namespace Composer\Test\Json;
 
+use Composer\Json\JsonFile;
 use Composer\Json\JsonManipulator;
 use Composer\Test\TestCase;
 
@@ -25,17 +26,17 @@ class JsonManipulatorTest extends TestCase
      * @param string $constraint
      * @param string $expected
      */
-    public function testAddLink($json, $type, $package, $constraint, $expected)
+    public function testAddLink(string $json, string $type, string $package, string $constraint, string $expected): void
     {
         $manipulator = new JsonManipulator($json);
-        $this->assertTrue($manipulator->addLink($type, $package, $constraint));
-        $this->assertEquals($expected, $manipulator->getContents());
+        self::assertTrue($manipulator->addLink($type, $package, $constraint));
+        self::assertEquals($expected, $manipulator->getContents());
     }
 
-    public function linkProvider()
+    public static function linkProvider(): array
     {
-        return array(
-            array(
+        return [
+            [
                 '{}',
                 'require',
                 'vendor/baz',
@@ -45,8 +46,8 @@ class JsonManipulatorTest extends TestCase
 "        \"vendor/baz\": \"qux\"\n".
 "    }\n".
 "}\n",
-            ),
-            array(
+            ],
+            [
                 '{
     "foo": "bar"
 }',
@@ -60,8 +61,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            array(
+            ],
+            [
                 '{
     "require": {
     }
@@ -75,8 +76,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            array(
+            ],
+            [
                 '{
     "empty": "",
     "require": {
@@ -94,8 +95,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            array(
+            ],
+            [
                 '{
     "require":
     {
@@ -114,9 +115,9 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
+            ],
 
-            array(
+            [
                 '{
     "require":
     {
@@ -135,8 +136,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            array(
+            ],
+            [
                 '{
     "require":
     {
@@ -155,8 +156,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            array(
+            ],
+            [
                 '{
     "require":
     {
@@ -175,8 +176,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            array(
+            ],
+            [
                 '{
     "require": {
         "foo": "bar"
@@ -207,8 +208,8 @@ class JsonManipulatorTest extends TestCase
     }]
 }
 ',
-            ),
-            array(
+            ],
+            [
                 '{
     "repositories": [{
         "type": "package",
@@ -236,8 +237,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            array(
+            ],
+            [
                 '{
     "require": {
         "php": "5.*"
@@ -255,8 +256,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            array(
+            ],
+            [
                 '{
     "require": {
         "php": "5.*"
@@ -277,8 +278,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            array(
+            ],
+            [
                 '{
     "repositories": [{
         "type": "package",
@@ -325,8 +326,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            array(
+            ],
+            [
                 '{
     "config": {
         "cache-files-ttl": 0,
@@ -1288,8 +1289,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-        );
+            ],
+        ];
     }
 
     /**
@@ -1301,17 +1302,17 @@ class JsonManipulatorTest extends TestCase
      * @param bool $sortPackages
      * @param string $expected
      */
-    public function testAddLinkAndSortPackages($json, $type, $package, $constraint, $sortPackages, $expected)
+    public function testAddLinkAndSortPackages(string $json, string $type, string $package, string $constraint, bool $sortPackages, string $expected): void
     {
         $manipulator = new JsonManipulator($json);
-        $this->assertTrue($manipulator->addLink($type, $package, $constraint, $sortPackages));
-        $this->assertEquals($expected, $manipulator->getContents());
+        self::assertTrue($manipulator->addLink($type, $package, $constraint, $sortPackages));
+        self::assertEquals($expected, $manipulator->getContents());
     }
 
-    public function providerAddLinkAndSortPackages()
+    public static function providerAddLinkAndSortPackages(): array
     {
-        return array(
-            array(
+        return [
+            [
                 '{
     "require": {
         "vendor/baz": "qux"
@@ -1328,8 +1329,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            array(
+            ],
+            [
                 '{
     "require": {
         "vendor/baz": "qux"
@@ -1346,8 +1347,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            array(
+            ],
+            [
                 '{
     "require": {
         "foo": "baz",
@@ -1374,8 +1375,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-        );
+            ],
+        ];
     }
 
     /**
@@ -1385,20 +1386,20 @@ class JsonManipulatorTest extends TestCase
      * @param string $expected
      * @param ?string $expectedContent
      */
-    public function testRemoveSubNode($json, $name, $expected, $expectedContent = null)
+    public function testRemoveSubNode(string $json, string $name, bool $expected, ?string $expectedContent = null): void
     {
         $manipulator = new JsonManipulator($json);
 
-        $this->assertEquals($expected, $manipulator->removeSubNode('repositories', $name));
+        self::assertEquals($expected, $manipulator->removeSubNode('repositories', $name));
         if (null !== $expectedContent) {
-            $this->assertEquals($expectedContent, $manipulator->getContents());
+            self::assertEquals($expectedContent, $manipulator->getContents());
         }
     }
 
-    public function removeSubNodeProvider()
+    public static function removeSubNodeProvider(): array
     {
-        return array(
-            'works on simple ones first' => array(
+        return [
+            'works on simple ones first' => [
                 '{
     "repositories": {
         "foo": {
@@ -1422,8 +1423,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            'works on simple ones last' => array(
+            ],
+            'works on simple ones last' => [
                 '{
     "repositories": {
         "foo": {
@@ -1447,8 +1448,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            'works on simple ones unique' => array(
+            ],
+            'works on simple ones unique' => [
                 '{
     "repositories": {
         "foo": {
@@ -1464,8 +1465,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            'works on simple ones escaped slash' => array(
+            ],
+            'works on simple ones escaped slash' => [
                 '{
     "repositories": {
         "foo\/bar": {
@@ -1480,8 +1481,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            'works on simple ones middle' => array(
+            ],
+            'works on simple ones middle' => [
                 '{
     "repositories": {
         "foo": {
@@ -1513,8 +1514,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            'works on undefined ones' => array(
+            ],
+            'works on undefined ones' => [
                 '{
     "repositories": {
         "main": {
@@ -1534,8 +1535,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            'works on child having unmatched name' => array(
+            ],
+            'works on child having unmatched name' => [
                 '{
     "repositories": {
         "baz": {
@@ -1555,8 +1556,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            'works on child having duplicate name' => array(
+            ],
+            'works on child having duplicate name' => [
                 '{
     "repositories": {
         "foo": {
@@ -1578,28 +1579,28 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            'works on empty repos' => array(
+            ],
+            'works on empty repos' => [
                 '{
     "repositories": {
     }
 }',
                 'bar',
                 true,
-            ),
-            'works on empty repos2' => array(
+            ],
+            'works on empty repos2' => [
                 '{
     "repositories": {}
 }',
                 'bar',
                 true,
-            ),
-            'works on missing repos' => array(
+            ],
+            'works on missing repos' => [
                 "{\n}",
                 'bar',
                 true,
-            ),
-            'works on deep repos' => array(
+            ],
+            'works on deep repos' => [
                 '{
     "repositories": {
         "foo": {
@@ -1614,8 +1615,8 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ',
-            ),
-            'works on deep repos with borked texts' => array(
+            ],
+            'works on deep repos with borked texts' => [
                 '{
     "repositories": {
         "foo": {
@@ -1637,8 +1638,8 @@ class JsonManipulatorTest extends TestCase
                 '{
 }
 ',
-            ),
-            'works on deep repos with borked texts2' => array(
+            ],
+            'works on deep repos with borked texts2' => [
                 '{
     "repositories": {
         "foo": {
@@ -1660,8 +1661,8 @@ class JsonManipulatorTest extends TestCase
                 '{
 }
 ',
-            ),
-            'fails on deep arrays with borked texts' => array(
+            ],
+            'fails on deep arrays with borked texts' => [
                 '{
     "repositories": [
         {
@@ -1671,8 +1672,8 @@ class JsonManipulatorTest extends TestCase
 }',
                 'bar',
                 false,
-            ),
-            'fails on deep arrays with borked texts2' => array(
+            ],
+            'fails on deep arrays with borked texts2' => [
                 '{
     "repositories": [
         {
@@ -1682,11 +1683,11 @@ class JsonManipulatorTest extends TestCase
 }',
                 'bar',
                 false,
-            ),
-        );
+            ],
+        ];
     }
 
-    public function testRemoveSubNodeFromRequire()
+    public function testRemoveSubNodeFromRequire(): void
     {
         $manipulator = new JsonManipulator('{
     "repositories": [
@@ -1711,9 +1712,9 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->removeSubNode('require', 'package/c'));
-        $this->assertTrue($manipulator->removeSubNode('require-dev', 'package/d'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->removeSubNode('require', 'package/c'));
+        self::assertTrue($manipulator->removeSubNode('require-dev', 'package/d'));
+        self::assertEquals('{
     "repositories": [
         {
             "package": {
@@ -1736,7 +1737,39 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddSubNodeInRequire()
+    public function testRemoveSubNodePreservesObjectTypeWhenEmpty(): void
+    {
+        $manipulator = new JsonManipulator('{
+    "test": {"0": "foo"}
+}');
+
+        self::assertTrue($manipulator->removeSubNode('test', '0'));
+        self::assertEquals('{
+    "test": {
+    }
+}
+', $manipulator->getContents());
+    }
+
+    public function testRemoveSubNodePreservesObjectTypeWhenEmpty2(): void
+    {
+        $manipulator = new JsonManipulator('{
+    "config": {
+        "preferred-install": {"foo/*": "source"}
+    }
+}');
+
+        self::assertTrue($manipulator->removeConfigSetting('preferred-install.foo/*'));
+        self::assertEquals('{
+    "config": {
+        "preferred-install": {
+        }
+    }
+}
+', $manipulator->getContents());
+    }
+
+    public function testAddSubNodeInRequire(): void
     {
         $manipulator = new JsonManipulator('{
     "repositories": [
@@ -1760,9 +1793,9 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addSubNode('require', 'package/c', '*'));
-        $this->assertTrue($manipulator->addSubNode('require-dev', 'package/e', '*'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addSubNode('require', 'package/c', '*'));
+        self::assertTrue($manipulator->addSubNode('require-dev', 'package/e', '*'));
+        self::assertEquals('{
     "repositories": [
         {
             "package": {
@@ -1788,7 +1821,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddExtraWithPackage()
+    public function testAddExtraWithPackage(): void
     {
         //$this->markTestSkipped();
         $manipulator = new JsonManipulator('{
@@ -1808,8 +1841,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addProperty('extra.foo-bar', true));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addProperty('extra.foo-bar', true));
+        self::assertEquals('{
     "repositories": [
         {
             "type": "package",
@@ -1829,7 +1862,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddConfigWithPackage()
+    public function testAddConfigWithPackage(): void
     {
         $manipulator = new JsonManipulator('{
     "repositories": [
@@ -1850,8 +1883,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addConfigSetting('preferred-install.my-organization/stable-package', 'dist'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addConfigSetting('preferred-install.my-organization/stable-package', 'dist'));
+        self::assertEquals('{
     "repositories": [
         {
             "type": "package",
@@ -1875,7 +1908,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddSuggestWithPackage()
+    public function testAddSuggestWithPackage(): void
     {
         $manipulator = new JsonManipulator('{
     "repositories": [
@@ -1894,8 +1927,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addProperty('suggest.new-package', 'new-description'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addProperty('suggest.new-package', 'new-description'));
+        self::assertEquals('{
     "repositories": [
         {
             "type": "package",
@@ -1915,15 +1948,15 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddRepositoryCanInitializeEmptyRepositories()
+    public function testAddRepositoryCanInitializeEmptyRepositories(): void
     {
         $manipulator = new JsonManipulator('{
   "repositories": {
   }
 }');
 
-        $this->assertTrue($manipulator->addRepository('bar', array('type' => 'composer')));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addRepository('bar', ['type' => 'composer']));
+        self::assertEquals('{
   "repositories": {
     "bar": {
       "type": "composer"
@@ -1933,14 +1966,14 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddRepositoryCanInitializeFromScratch()
+    public function testAddRepositoryCanInitializeFromScratch(): void
     {
         $manipulator = new JsonManipulator("{
 \t\"a\": \"b\"
 }");
 
-        $this->assertTrue($manipulator->addRepository('bar2', array('type' => 'composer')));
-        $this->assertEquals("{
+        self::assertTrue($manipulator->addRepository('bar2', ['type' => 'composer']));
+        self::assertEquals("{
 \t\"a\": \"b\",
 \t\"repositories\": {
 \t\t\"bar2\": {
@@ -1951,7 +1984,7 @@ class JsonManipulatorTest extends TestCase
 ", $manipulator->getContents());
     }
 
-    public function testAddRepositoryCanAppend()
+    public function testAddRepositoryCanAppend(): void
     {
         $manipulator = new JsonManipulator('{
     "repositories": {
@@ -1962,8 +1995,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addRepository('bar', array('type' => 'composer'), true));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addRepository('bar', ['type' => 'composer'], true));
+        self::assertEquals('{
     "repositories": {
         "foo": {
             "type": "vcs",
@@ -1977,7 +2010,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddRepositoryCanPrepend()
+    public function testAddRepositoryCanPrepend(): void
     {
         $manipulator = new JsonManipulator('{
     "repositories": {
@@ -1988,8 +2021,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addRepository('bar', array('type' => 'composer'), false));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addRepository('bar', ['type' => 'composer'], false));
+        self::assertEquals('{
     "repositories": {
         "bar": {
             "type": "composer"
@@ -2003,7 +2036,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddRepositoryCanOverrideDeepRepos()
+    public function testAddRepositoryCanOverrideDeepRepos(): void
     {
         $manipulator = new JsonManipulator('{
     "repositories": {
@@ -2014,8 +2047,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addRepository('baz', array('type' => 'composer')));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addRepository('baz', ['type' => 'composer']));
+        self::assertEquals('{
     "repositories": {
         "baz": {
             "type": "composer"
@@ -2025,16 +2058,16 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddConfigSettingEscapes()
+    public function testAddConfigSettingEscapes(): void
     {
         $manipulator = new JsonManipulator('{
     "config": {
     }
 }');
 
-        $this->assertTrue($manipulator->addConfigSetting('test', 'a\b'));
-        $this->assertTrue($manipulator->addConfigSetting('test2', "a\nb\fa"));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addConfigSetting('test', 'a\b'));
+        self::assertTrue($manipulator->addConfigSetting('test2', "a\nb\fa"));
+        self::assertEquals('{
     "config": {
         "test": "a\\\\b",
         "test2": "a\nb\fa"
@@ -2043,13 +2076,13 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddConfigSettingWorksFromScratch()
+    public function testAddConfigSettingWorksFromScratch(): void
     {
         $manipulator = new JsonManipulator('{
 }');
 
-        $this->assertTrue($manipulator->addConfigSetting('foo.bar', 'baz'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addConfigSetting('foo.bar', 'baz'));
+        self::assertEquals('{
     "config": {
         "foo": {
             "bar": "baz"
@@ -2059,7 +2092,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddConfigSettingCanAdd()
+    public function testAddConfigSettingCanAdd(): void
     {
         $manipulator = new JsonManipulator('{
     "config": {
@@ -2067,8 +2100,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addConfigSetting('bar', 'baz'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addConfigSetting('bar', 'baz'));
+        self::assertEquals('{
     "config": {
         "foo": "bar",
         "bar": "baz"
@@ -2077,7 +2110,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddConfigSettingCanOverwrite()
+    public function testAddConfigSettingCanOverwrite(): void
     {
         $manipulator = new JsonManipulator('{
     "config": {
@@ -2086,8 +2119,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addConfigSetting('foo', 'zomg'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addConfigSetting('foo', 'zomg'));
+        self::assertEquals('{
     "config": {
         "foo": "zomg",
         "bar": "baz"
@@ -2096,7 +2129,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddConfigSettingCanOverwriteNumbers()
+    public function testAddConfigSettingCanOverwriteNumbers(): void
     {
         $manipulator = new JsonManipulator('{
     "config": {
@@ -2104,8 +2137,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addConfigSetting('foo', 50));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addConfigSetting('foo', 50));
+        self::assertEquals('{
     "config": {
         "foo": 50
     }
@@ -2113,7 +2146,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddConfigSettingCanOverwriteArrays()
+    public function testAddConfigSettingCanOverwriteArrays(): void
     {
         $manipulator = new JsonManipulator('{
     "config": {
@@ -2124,8 +2157,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addConfigSetting('github-protocols', array('https', 'http')));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addConfigSetting('github-protocols', ['https', 'http']));
+        self::assertEquals('{
     "config": {
         "github-oauth": {
             "github.com": "foo"
@@ -2135,8 +2168,8 @@ class JsonManipulatorTest extends TestCase
 }
 ', $manipulator->getContents());
 
-        $this->assertTrue($manipulator->addConfigSetting('github-oauth', array('github.com' => 'bar', 'alt.example.org' => 'baz')));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addConfigSetting('github-oauth', ['github.com' => 'bar', 'alt.example.org' => 'baz']));
+        self::assertEquals('{
     "config": {
         "github-oauth": {
             "github.com": "bar",
@@ -2148,15 +2181,15 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddConfigSettingCanAddSubKeyInEmptyConfig()
+    public function testAddConfigSettingCanAddSubKeyInEmptyConfig(): void
     {
         $manipulator = new JsonManipulator('{
     "config": {
     }
 }');
 
-        $this->assertTrue($manipulator->addConfigSetting('github-oauth.bar', 'baz'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addConfigSetting('github-oauth.bar', 'baz'));
+        self::assertEquals('{
     "config": {
         "github-oauth": {
             "bar": "baz"
@@ -2166,7 +2199,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddConfigSettingCanAddSubKeyInEmptyVal()
+    public function testAddConfigSettingCanAddSubKeyInEmptyVal(): void
     {
         $manipulator = new JsonManipulator('{
     "config": {
@@ -2176,10 +2209,10 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addConfigSetting('github-oauth.bar', 'baz'));
-        $this->assertTrue($manipulator->addConfigSetting('github-oauth2.a.bar', 'baz2'));
-        $this->assertTrue($manipulator->addConfigSetting('github-oauth3.b', 'c'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addConfigSetting('github-oauth.bar', 'baz'));
+        self::assertTrue($manipulator->addConfigSetting('github-oauth2.a.bar', 'baz2'));
+        self::assertTrue($manipulator->addConfigSetting('github-oauth3.b', 'c'));
+        self::assertEquals('{
     "config": {
         "github-oauth": {
             "bar": "baz"
@@ -2195,7 +2228,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddConfigSettingCanAddSubKeyInHash()
+    public function testAddConfigSettingCanAddSubKeyInHash(): void
     {
         $manipulator = new JsonManipulator('{
     "config": {
@@ -2205,8 +2238,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addConfigSetting('github-oauth.bar', 'baz'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addConfigSetting('github-oauth.bar', 'baz'));
+        self::assertEquals('{
     "config": {
         "github-oauth": {
             "github.com": "foo",
@@ -2217,7 +2250,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddRootSettingDoesNotBreakDots()
+    public function testAddRootSettingDoesNotBreakDots(): void
     {
         $manipulator = new JsonManipulator('{
     "github-oauth": {
@@ -2225,8 +2258,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addSubNode('github-oauth', 'bar', 'baz'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addSubNode('github-oauth', 'bar', 'baz'));
+        self::assertEquals('{
     "github-oauth": {
         "github.com": "foo",
         "bar": "baz"
@@ -2235,7 +2268,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testRemoveConfigSettingCanRemoveSubKeyInHash()
+    public function testRemoveConfigSettingCanRemoveSubKeyInHash(): void
     {
         $manipulator = new JsonManipulator('{
     "config": {
@@ -2246,8 +2279,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->removeConfigSetting('github-oauth.bar'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->removeConfigSetting('github-oauth.bar'));
+        self::assertEquals('{
     "config": {
         "github-oauth": {
             "github.com": "foo"
@@ -2257,7 +2290,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testRemoveConfigSettingCanRemoveSubKeyInHashWithSiblings()
+    public function testRemoveConfigSettingCanRemoveSubKeyInHashWithSiblings(): void
     {
         $manipulator = new JsonManipulator('{
     "config": {
@@ -2269,8 +2302,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->removeConfigSetting('github-oauth.bar'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->removeConfigSetting('github-oauth.bar'));
+        self::assertEquals('{
     "config": {
         "foo": "bar",
         "github-oauth": {
@@ -2281,59 +2314,59 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testAddMainKey()
+    public function testAddMainKey(): void
     {
         $manipulator = new JsonManipulator('{
     "foo": "bar"
 }');
 
-        $this->assertTrue($manipulator->addMainKey('bar', 'baz'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addMainKey('bar', 'baz'));
+        self::assertEquals('{
     "foo": "bar",
     "bar": "baz"
 }
 ', $manipulator->getContents());
     }
 
-    public function testAddMainKeyWithContentHavingDollarSignFollowedByDigit()
+    public function testAddMainKeyWithContentHavingDollarSignFollowedByDigit(): void
     {
         $manipulator = new JsonManipulator('{
     "foo": "bar"
 }');
 
-        $this->assertTrue($manipulator->addMainKey('bar', '$1baz'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addMainKey('bar', '$1baz'));
+        self::assertEquals('{
     "foo": "bar",
     "bar": "$1baz"
 }
 ', $manipulator->getContents());
     }
 
-    public function testAddMainKeyWithContentHavingDollarSignFollowedByDigit2()
+    public function testAddMainKeyWithContentHavingDollarSignFollowedByDigit2(): void
     {
         $manipulator = new JsonManipulator('{}');
 
-        $this->assertTrue($manipulator->addMainKey('foo', '$1bar'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addMainKey('foo', '$1bar'));
+        self::assertEquals('{
     "foo": "$1bar"
 }
 ', $manipulator->getContents());
     }
 
-    public function testUpdateMainKey()
+    public function testUpdateMainKey(): void
     {
         $manipulator = new JsonManipulator('{
     "foo": "bar"
 }');
 
-        $this->assertTrue($manipulator->addMainKey('foo', 'baz'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addMainKey('foo', 'baz'));
+        self::assertEquals('{
     "foo": "baz"
 }
 ', $manipulator->getContents());
     }
 
-    public function testUpdateMainKey2()
+    public function testUpdateMainKey2(): void
     {
         $manipulator = new JsonManipulator('{
     "a": {
@@ -2344,9 +2377,9 @@ class JsonManipulatorTest extends TestCase
     "baz": "bar"
 }');
 
-        $this->assertTrue($manipulator->addMainKey('foo', 'baz'));
-        $this->assertTrue($manipulator->addMainKey('baz', 'quux'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addMainKey('foo', 'baz'));
+        self::assertTrue($manipulator->addMainKey('baz', 'quux'));
+        self::assertEquals('{
     "a": {
         "foo": "bar",
         "baz": "qux"
@@ -2357,7 +2390,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testUpdateMainKey3()
+    public function testUpdateMainKey3(): void
     {
         $manipulator = new JsonManipulator('{
     "require": {
@@ -2368,8 +2401,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->addMainKey('require-dev', array('foo' => 'qux')));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addMainKey('require-dev', ['foo' => 'qux']));
+        self::assertEquals('{
     "require": {
         "php": "5.*"
     },
@@ -2380,20 +2413,20 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testUpdateMainKeyWithContentHavingDollarSignFollowedByDigit()
+    public function testUpdateMainKeyWithContentHavingDollarSignFollowedByDigit(): void
     {
         $manipulator = new JsonManipulator('{
     "foo": "bar"
 }');
 
-        $this->assertTrue($manipulator->addMainKey('foo', '$1bar'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addMainKey('foo', '$1bar'));
+        self::assertEquals('{
     "foo": "$1bar"
 }
 ', $manipulator->getContents());
     }
 
-    public function testRemoveMainKey()
+    public function testRemoveMainKey(): void
     {
         $manipulator = new JsonManipulator('{
     "repositories": [
@@ -2419,8 +2452,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->removeMainKey('repositories'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->removeMainKey('repositories'));
+        self::assertEquals('{
     "require": {
         "package/a": "*",
         "package/b": "*",
@@ -2433,8 +2466,8 @@ class JsonManipulatorTest extends TestCase
 }
 ', $manipulator->getContents());
 
-        $this->assertTrue($manipulator->removeMainKey('foo'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->removeMainKey('foo'));
+        self::assertEquals('{
     "require": {
         "package/a": "*",
         "package/b": "*",
@@ -2446,14 +2479,14 @@ class JsonManipulatorTest extends TestCase
 }
 ', $manipulator->getContents());
 
-        $this->assertTrue($manipulator->removeMainKey('require'));
-        $this->assertTrue($manipulator->removeMainKey('require-dev'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->removeMainKey('require'));
+        self::assertTrue($manipulator->removeMainKey('require-dev'));
+        self::assertEquals('{
 }
 ', $manipulator->getContents());
     }
 
-    public function testRemoveMainKeyIfEmpty()
+    public function testRemoveMainKeyIfEmpty(): void
     {
         $manipulator = new JsonManipulator('{
     "repositories": [
@@ -2468,8 +2501,8 @@ class JsonManipulatorTest extends TestCase
     }
 }');
 
-        $this->assertTrue($manipulator->removeMainKeyIfEmpty('repositories'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->removeMainKeyIfEmpty('repositories'));
+        self::assertEquals('{
     "require": {
         "package/a": "*",
         "package/b": "*",
@@ -2481,10 +2514,10 @@ class JsonManipulatorTest extends TestCase
 }
 ', $manipulator->getContents());
 
-        $this->assertTrue($manipulator->removeMainKeyIfEmpty('foo'));
-        $this->assertTrue($manipulator->removeMainKeyIfEmpty('require'));
-        $this->assertTrue($manipulator->removeMainKeyIfEmpty('require-dev'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->removeMainKeyIfEmpty('foo'));
+        self::assertTrue($manipulator->removeMainKeyIfEmpty('require'));
+        self::assertTrue($manipulator->removeMainKeyIfEmpty('require-dev'));
+        self::assertEquals('{
     "require": {
         "package/a": "*",
         "package/b": "*",
@@ -2495,23 +2528,23 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testRemoveMainKeyRemovesKeyWhereValueIsNull()
+    public function testRemoveMainKeyRemovesKeyWhereValueIsNull(): void
     {
-        $manipulator = new JsonManipulator(json_encode(array(
+        $manipulator = new JsonManipulator(json_encode([
             'foo' => 9000,
             'bar' => null,
-        )));
+        ]));
 
         $manipulator->removeMainKey('bar');
 
-        $expected = json_encode(array(
+        $expected = JsonFile::encode([
             'foo' => 9000,
-        ));
+        ]);
 
-        $this->assertJsonStringEqualsJsonString($expected, $manipulator->getContents());
+        self::assertJsonStringEqualsJsonString($expected, $manipulator->getContents());
     }
 
-    public function testIndentDetection()
+    public function testIndentDetection(): void
     {
         $manipulator = new JsonManipulator('{
 
@@ -2520,8 +2553,8 @@ class JsonManipulatorTest extends TestCase
   }
 }');
 
-        $this->assertTrue($manipulator->addMainKey('require-dev', array('foo' => 'qux')));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addMainKey('require-dev', ['foo' => 'qux']));
+        self::assertEquals('{
 
   "require": {
     "php": "5.*"
@@ -2533,7 +2566,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testRemoveMainKeyAtEndOfFile()
+    public function testRemoveMainKeyAtEndOfFile(): void
     {
         $manipulator = new JsonManipulator('{
     "require": {
@@ -2541,9 +2574,9 @@ class JsonManipulatorTest extends TestCase
     }
 }
 ');
-        $this->assertTrue($manipulator->addMainKey('homepage', 'http...'));
-        $this->assertTrue($manipulator->addMainKey('license', 'mit'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addMainKey('homepage', 'http...'));
+        self::assertTrue($manipulator->addMainKey('license', 'mit'));
+        self::assertEquals('{
     "require": {
         "package/a": "*"
     },
@@ -2552,9 +2585,9 @@ class JsonManipulatorTest extends TestCase
 }
 ', $manipulator->getContents());
 
-        $this->assertTrue($manipulator->removeMainKey('homepage'));
-        $this->assertTrue($manipulator->removeMainKey('license'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->removeMainKey('homepage'));
+        self::assertTrue($manipulator->removeMainKey('license'));
+        self::assertEquals('{
     "require": {
         "package/a": "*"
     }
@@ -2562,7 +2595,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testEscapedUnicodeDoesNotCauseBacktrackLimitErrorGithubIssue8131()
+    public function testEscapedUnicodeDoesNotCauseBacktrackLimitErrorGithubIssue8131(): void
     {
         $manipulator = new JsonManipulator('{
   "description": "Some U\u00F1icode",
@@ -2571,8 +2604,8 @@ class JsonManipulatorTest extends TestCase
   }
 }');
 
-        $this->assertTrue($manipulator->addLink('require', 'foo/baz', '^1.0'));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addLink('require', 'foo/baz', '^1.0'));
+        self::assertEquals('{
   "description": "Some U\u00F1icode",
   "require": {
     "foo/bar": "^1.0",
@@ -2582,7 +2615,7 @@ class JsonManipulatorTest extends TestCase
 ', $manipulator->getContents());
     }
 
-    public function testLargeFileDoesNotCauseBacktrackLimitErrorGithubIssue9595()
+    public function testLargeFileDoesNotCauseBacktrackLimitErrorGithubIssue9595(): void
     {
         $manipulator = new JsonManipulator('{
     "name": "leoloso/pop",
@@ -3234,8 +3267,8 @@ class JsonManipulatorTest extends TestCase
     "prefer-stable": true
 }');
 
-        $this->assertTrue($manipulator->addSubNode('config', 'platform-check', false));
-        $this->assertEquals('{
+        self::assertTrue($manipulator->addSubNode('config', 'platform-check', false));
+        self::assertEquals('{
     "name": "leoloso/pop",
     "require": {
         "php": "^7.4|^8.0",

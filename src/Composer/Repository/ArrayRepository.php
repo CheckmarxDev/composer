@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -42,7 +42,7 @@ class ArrayRepository implements RepositoryInterface
     /**
      * @param array<PackageInterface> $packages
      */
-    public function __construct(array $packages = array())
+    public function __construct(array $packages = [])
     {
         foreach ($packages as $package) {
             $this->addPackage($package);
@@ -57,7 +57,7 @@ class ArrayRepository implements RepositoryInterface
     /**
      * @inheritDoc
      */
-    public function loadPackages(array $packageMap, array $acceptableStabilities, array $stabilityFlags, array $alreadyLoaded = array())
+    public function loadPackages(array $packageNameMap, array $acceptableStabilities, array $stabilityFlags, array $alreadyLoaded = [])
     {
         // Alechko fix
         // Instead of throwing an exception on a non-resolved registry, ignore it
@@ -69,12 +69,12 @@ class ArrayRepository implements RepositoryInterface
         }
         //$packages = $this->getPackages();
 
-        $result = array();
-        $namesFound = array();
+        $result = [];
+        $namesFound = [];
         foreach ($packages as $package) {
-            if (array_key_exists($package->getName(), $packageMap)) {
+            if (array_key_exists($package->getName(), $packageNameMap)) {
                 if (
-                    (!$packageMap[$package->getName()] || $packageMap[$package->getName()]->matches(new Constraint('==', $package->getVersion())))
+                    (!$packageNameMap[$package->getName()] || $packageNameMap[$package->getName()]->matches(new Constraint('==', $package->getVersion())))
                     && StabilityFilter::isPackageAcceptable($acceptableStabilities, $stabilityFlags, $package->getNames(), $package->getStability())
                     && !isset($alreadyLoaded[$package->getName()][$package->getVersion()])
                 ) {
@@ -99,13 +99,13 @@ class ArrayRepository implements RepositoryInterface
             }
         }
 
-        return array('namesFound' => array_keys($namesFound), 'packages' => $result);
+        return ['namesFound' => array_keys($namesFound), 'packages' => $result];
     }
 
     /**
      * @inheritDoc
      */
-    public function findPackage($name, $constraint)
+    public function findPackage(string $name, $constraint)
     {
         $name = strtolower($name);
 
@@ -129,11 +129,11 @@ class ArrayRepository implements RepositoryInterface
     /**
      * @inheritDoc
      */
-    public function findPackages($name, $constraint = null)
+    public function findPackages(string $name, $constraint = null)
     {
         // normalize name
         $name = strtolower($name);
-        $packages = array();
+        $packages = [];
 
         if (null !== $constraint && !$constraint instanceof ConstraintInterface) {
             $versionParser = new VersionParser();
@@ -154,7 +154,7 @@ class ArrayRepository implements RepositoryInterface
     /**
      * @inheritDoc
      */
-    public function search($query, $mode = 0, $type = null)
+    public function search(string $query, int $mode = 0, ?string $type = null)
     {
         if ($mode === self::SEARCH_FULLTEXT) {
             $regex = '{(?:'.implode('|', Preg::split('{\s+}', preg_quote($query))).')}i';
@@ -163,11 +163,11 @@ class ArrayRepository implements RepositoryInterface
             $regex = '{(?:'.implode('|', Preg::split('{\s+}', $query)).')}i';
         }
 
-        $matches = array();
+        $matches = [];
         foreach ($this->getPackages() as $package) {
             $name = $package->getName();
             if ($mode === self::SEARCH_VENDOR) {
-                list($name) = explode('/', $name);
+                [$name] = explode('/', $name);
             }
             if (isset($matches[$name])) {
                 continue;
@@ -180,15 +180,15 @@ class ArrayRepository implements RepositoryInterface
                 || ($mode === self::SEARCH_FULLTEXT && $package instanceof CompletePackageInterface && Preg::isMatch($regex, implode(' ', (array) $package->getKeywords()) . ' ' . $package->getDescription()))
             ) {
                 if ($mode === self::SEARCH_VENDOR) {
-                    $matches[$name] = array(
+                    $matches[$name] = [
                         'name' => $name,
                         'description' => null,
-                    );
+                    ];
                 } else {
-                    $matches[$name] = array(
+                    $matches[$name] = [
                         'name' => $package->getPrettyName(),
                         'description' => $package instanceof CompletePackageInterface ? $package->getDescription() : null,
-                    );
+                    ];
 
                     if ($package instanceof CompletePackageInterface && $package->isAbandoned()) {
                         $matches[$name]['abandoned'] = $package->getReplacementPackage() ?: true;
@@ -206,7 +206,7 @@ class ArrayRepository implements RepositoryInterface
     public function hasPackage(PackageInterface $package)
     {
         if ($this->packageMap === null) {
-            $this->packageMap = array();
+            $this->packageMap = [];
             foreach ($this->getPackages() as $repoPackage) {
                 $this->packageMap[$repoPackage->getUniqueName()] = $repoPackage;
             }
@@ -245,9 +245,9 @@ class ArrayRepository implements RepositoryInterface
     /**
      * @inheritDoc
      */
-    public function getProviders($packageName)
+    public function getProviders(string $packageName)
     {
-        $result = array();
+        $result = [];
 
         foreach ($this->getPackages() as $candidate) {
             if (isset($result[$candidate->getName()])) {
@@ -255,11 +255,11 @@ class ArrayRepository implements RepositoryInterface
             }
             foreach ($candidate->getProvides() as $link) {
                 if ($packageName === $link->getTarget()) {
-                    $result[$candidate->getName()] = array(
+                    $result[$candidate->getName()] = [
                         'name' => $candidate->getName(),
                         'description' => $candidate instanceof CompletePackageInterface ? $candidate->getDescription() : null,
                         'type' => $candidate->getType(),
-                    );
+                    ];
                     continue 2;
                 }
             }
@@ -269,12 +269,9 @@ class ArrayRepository implements RepositoryInterface
     }
 
     /**
-     * @param string $alias
-     * @param string $prettyAlias
-     *
      * @return AliasPackage|CompleteAliasPackage
      */
-    protected function createAliasPackage(BasePackage $package, $alias, $prettyAlias)
+    protected function createAliasPackage(BasePackage $package, string $alias, string $prettyAlias)
     {
         while ($package instanceof AliasPackage) {
             $package = $package->getAliasOf();
@@ -329,10 +326,9 @@ class ArrayRepository implements RepositoryInterface
     /**
      * Returns the number of packages in this repository
      *
-     * @return int Number of packages
+     * @return 0|positive-int Number of packages
      */
-    #[\ReturnTypeWillChange]
-    public function count()
+    public function count(): int
     {
         if (null === $this->packages) {
             $this->initialize();
@@ -348,6 +344,6 @@ class ArrayRepository implements RepositoryInterface
      */
     protected function initialize()
     {
-        $this->packages = array();
+        $this->packages = [];
     }
 }

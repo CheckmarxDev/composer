@@ -59,7 +59,7 @@ you to require certain versions of server software. See
 ### Package version constraints
 
 In our example, we are requesting the Monolog package with the version constraint
-[`2.0.*`](https://semver.mwl.be/#?package=monolog%2Fmonolog&version=2.0.*).
+[`2.0.*`](https://semver.madewithlove.com/?package=monolog%2Fmonolog&constraint=2.0.*).
 This means any version in the `2.0` development branch, or any version that is
 greater than or equal to 2.0 and less than 2.1 (`>=2.0 <2.1`).
 
@@ -92,7 +92,7 @@ versions, how versions relate to each other, and on version constraints.
 To initially install the defined dependencies for your project, you should run the
 [`update`](03-cli.md#update-u) command.
 
-```sh
+```shell
 php composer.phar update
 ```
 
@@ -122,12 +122,42 @@ versions of the dependencies that you are using. Your CI server, production
 machines, other developers in your team, everything and everyone runs on the
 same dependencies, which mitigates the potential for bugs affecting only some
 parts of the deployments. Even if you develop alone, in six months when
-reinstalling the project you can feel confident the dependencies installed are
-still working even if your dependencies released many new versions since then.
+reinstalling the project you can feel confident that the dependencies installed are
+still working, even if the dependencies have released many new versions since then.
 (See note below about using the `update` command.)
 
 > **Note:** For libraries it is not necessary to commit the lock
 > file, see also: [Libraries - Lock file](02-libraries.md#lock-file).
+
+### Installing from `composer.lock`
+
+If there is already a `composer.lock` file in the project folder, it means either
+you ran the `update` command before, or someone else on the project ran the `update`
+command and committed the `composer.lock` file to the project (which is good).
+
+Either way, running `install` when a `composer.lock` file is present resolves and installs
+all dependencies that you listed in `composer.json`, but Composer uses the exact versions listed
+in `composer.lock` to ensure that the package versions are consistent for everyone
+working on your project. As a result you will have all dependencies requested by your
+`composer.json` file, but they may not all be at the very latest available versions
+(some of the dependencies listed in the `composer.lock` file may have released newer versions since
+the file was created). This is by design, ensuring that your project does not break because of
+unexpected changes in dependencies.
+
+So after fetching new changes from your VCS repository it is recommended to run
+a Composer `install` to make sure the vendor directory is up in sync with your
+`composer.lock` file.
+
+```shell
+php composer.phar install
+```
+
+Composer enables reproducible builds by default. This means that running the
+same command multiple times will produce a `vendor/` directory containing files
+that are identical (*except their timestamps*), including the autoloader files.
+It is especially beneficial for environments that require strict
+verification processes, as well as for Linux distributions aiming to package PHP
+applications in a secure and predictable manner.
 
 ### Installing from `composer.lock`
 
@@ -160,7 +190,7 @@ the latest versions of your dependencies. To update to the latest versions, use 
 versions (according to your `composer.json` file) and update the lock file
 with the new versions.
 
-```sh
+```shell
 php composer.phar update
 ```
 
@@ -170,7 +200,7 @@ php composer.phar update
 
 If you only want to install, upgrade or remove one dependency, you can explicitly list it as an argument:
 
-```sh
+```shell
 php composer.phar update monolog/monolog [...]
 ```
 
@@ -249,7 +279,7 @@ filename would be `src/Foo.php` containing an `Acme\Foo` class.
 After adding the [`autoload`](04-schema.md#autoload) field, you have to re-run
 this command:
 
-```sh
+```shell
 php composer.phar dump-autoload
 ```
 

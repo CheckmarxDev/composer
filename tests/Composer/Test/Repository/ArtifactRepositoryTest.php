@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -19,7 +19,7 @@ use Composer\Package\BasePackage;
 
 class ArtifactRepositoryTest extends TestCase
 {
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
         if (!extension_loaded('zip')) {
@@ -27,9 +27,9 @@ class ArtifactRepositoryTest extends TestCase
         }
     }
 
-    public function testExtractsConfigsFromZipArchives()
+    public function testExtractsConfigsFromZipArchives(): void
     {
-        $expectedPackages = array(
+        $expectedPackages = [
             'vendor0/package0-0.0.1',
             'composer/composer-1.0.0-alpha6',
             'vendor1/package2-4.3.2',
@@ -39,47 +39,47 @@ class ArtifactRepositoryTest extends TestCase
             'test/jsonInFirstLevel-1.0.0',
             //The files not-an-artifact.zip and jsonSecondLevel are not valid
             //artifacts and do not get detected.
-        );
+        ];
 
-        $coordinates = array('type' => 'artifact', 'url' => __DIR__ . '/Fixtures/artifacts');
+        $coordinates = ['type' => 'artifact', 'url' => __DIR__ . '/Fixtures/artifacts'];
         $repo = new ArtifactRepository($coordinates, new NullIO());
 
-        $foundPackages = array_map(function (BasePackage $package) {
+        $foundPackages = array_map(static function (BasePackage $package) {
             return "{$package->getPrettyName()}-{$package->getPrettyVersion()}";
         }, $repo->getPackages());
 
         sort($expectedPackages);
         sort($foundPackages);
 
-        $this->assertSame($expectedPackages, $foundPackages);
+        self::assertSame($expectedPackages, $foundPackages);
 
-        $tarPackage = array_filter($repo->getPackages(), function (BasePackage $package) {
+        $tarPackage = array_filter($repo->getPackages(), static function (BasePackage $package): bool {
             return $package->getPrettyName() === 'test/jsonInRootTarFile';
         });
-        $this->assertCount(1, $tarPackage);
+        self::assertCount(1, $tarPackage);
         $tarPackage = array_pop($tarPackage);
-        $this->assertSame('tar', $tarPackage->getDistType());
+        self::assertSame('tar', $tarPackage->getDistType());
     }
 
-    public function testAbsoluteRepoUrlCreatesAbsoluteUrlPackages()
+    public function testAbsoluteRepoUrlCreatesAbsoluteUrlPackages(): void
     {
         $absolutePath = __DIR__ . '/Fixtures/artifacts';
-        $coordinates = array('type' => 'artifact', 'url' => $absolutePath);
+        $coordinates = ['type' => 'artifact', 'url' => $absolutePath];
         $repo = new ArtifactRepository($coordinates, new NullIO());
 
         foreach ($repo->getPackages() as $package) {
-            $this->assertSame(strpos($package->getDistUrl(), strtr($absolutePath, '\\', '/')), 0);
+            self::assertSame(strpos($package->getDistUrl(), strtr($absolutePath, '\\', '/')), 0);
         }
     }
 
-    public function testRelativeRepoUrlCreatesRelativeUrlPackages()
+    public function testRelativeRepoUrlCreatesRelativeUrlPackages(): void
     {
         $relativePath = 'tests/Composer/Test/Repository/Fixtures/artifacts';
-        $coordinates = array('type' => 'artifact', 'url' => $relativePath);
+        $coordinates = ['type' => 'artifact', 'url' => $relativePath];
         $repo = new ArtifactRepository($coordinates, new NullIO());
 
         foreach ($repo->getPackages() as $package) {
-            $this->assertSame(strpos($package->getDistUrl(), $relativePath), 0);
+            self::assertSame(strpos($package->getDistUrl(), $relativePath), 0);
         }
     }
 }

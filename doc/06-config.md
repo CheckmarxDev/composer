@@ -26,8 +26,7 @@ helper is available:
 
 ## allow-plugins
 
-Defaults to `null` (allow all plugins implicitly) for backwards compatibility until July 2022.
-At that point the default will become `{}` and plugins will not load anymore unless allowed.
+Defaults to `{}` which does not allow any plugins to be loaded.
 
 As of Composer 2.2.0, the `allow-plugins` option adds a layer of security
 allowing you to restrict which Composer plugins are able to execute code during
@@ -53,7 +52,15 @@ and **false** to disallow while suppressing further warnings and prompts.
 }
 ```
 
-You can also set the config option itself to `false` to disallow all plugins, or `true` to allow all plugins to run (NOT recommended).
+You can also set the config option itself to `false` to disallow all plugins, or `true` to allow all plugins to run (NOT recommended). For example:
+
+```json
+{
+    "config": {
+        "allow-plugins": false
+    }
+}
+```
 
 ## use-include-path
 
@@ -93,6 +100,60 @@ optionally be an object with package name patterns for keys for more granular in
 > more relaxed patterns. When mixing the string notation with the hash
 > configuration in global and package configurations the string notation
 > is translated to a `*` package pattern.
+
+## audit
+
+Security audit configuration options
+
+### ignore
+
+A list of advisory ids, remote ids or CVE ids that are reported but let the audit command pass.
+
+```json
+{
+    "config": {
+        "audit": {
+            "ignore": {
+                "CVE-1234": "The affected component is not in use.",
+                "GHSA-xx": "The security fix was applied as a patch.",
+                "PKSA-yy": "Due to mitigations in place the update can be delayed."
+            }
+        }
+    }
+}
+```
+
+or
+
+```json
+{
+    "config": {
+        "audit": {
+            "ignore": ["CVE-1234", "GHSA-xx", "PKSA-yy"]
+        }
+    }
+}
+```
+
+### abandoned
+
+Defaults to `report` in Composer 2.6, and defaults to `fail` from Composer 2.7 on. Defines whether the audit command reports abandoned packages or not, this has three possible values:
+
+- `ignore` means the audit command does not consider abandoned packages at all.
+- `report` means abandoned packages are reported as an error but do not cause the command to exit with a non-zero code.
+- `fail` means abandoned packages will cause audits to fail with a non-zero code.
+
+```json
+{
+    "config": {
+        "audit": {
+            "abandoned": "report"
+        }
+    }
+}
+```
+
+Since Composer 2.7 the option can be overridden via the [`COMPOSER_AUDIT_ABANDONED`](03-cli.md#composer-audit-abandoned) environment variable.
 
 ## use-parent-dir
 
@@ -223,7 +284,8 @@ production env or define your target platform in the config. Example: `{"php":
 This will make sure that no package requiring more than PHP 7.0.3 can be installed
 regardless of the actual PHP version you run locally. However it also means
 the dependencies are not checked correctly anymore, if you run PHP 5.6 it will
-install fine as it assumes 7.0.3, but then it will fail at runtime.
+install fine as it assumes 7.0.3, but then it will fail at runtime. This also means if
+`{"php":"7.4"}` is specified; no packages will be used that define `7.4.1` as minimum.
 
 Therefore if you use this it is recommended, and safer, to also run the
 [`check-platform-reqs`](03-cli.md#check-platform-reqs) command as part of your
@@ -315,8 +377,10 @@ with other autoloaders.
 
 ## autoloader-suffix
 
-Defaults to `null`. String to be used as a suffix for the generated Composer
-autoloader. When null a random one will be generated.
+Defaults to `null`. When set to a non-empty string, this value will be used as a
+suffix for the generated Composer autoloader. If set to `null`, the
+`content-hash` value from the `composer.lock` file will be used if available;
+otherwise, a random suffix will be generated.
 
 ## optimize-autoloader
 
@@ -396,7 +460,7 @@ in the Composer home, cache, and data directories.
 ## lock
 
 Defaults to `true`. If set to `false`, Composer will not create a `composer.lock`
-file.
+file and will ignore it if one is present.
 
 ## platform-check
 

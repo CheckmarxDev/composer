@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -20,52 +20,57 @@ use Composer\Test\TestCase;
  */
 class ErrorHandlerTest extends TestCase
 {
-    public function setUp()
+    public function setUp(): void
     {
         ErrorHandler::register();
     }
 
-    public function tearDown()
+    protected function tearDown(): void
     {
+        parent::tearDown();
         restore_error_handler();
     }
 
     /**
      * Test ErrorHandler handles notices
      */
-    public function testErrorHandlerCaptureNotice()
+    public function testErrorHandlerCaptureNotice(): void
     {
-        if (PHP_VERSION_ID >= 80000) {
-            $this->setExpectedException('\ErrorException', 'Undefined array key "baz"');
+        if (\PHP_VERSION_ID >= 80000) {
+            self::expectException('\ErrorException');
+            self::expectExceptionMessage('Undefined array key "baz"');
         } else {
-            $this->setExpectedException('\ErrorException', 'Undefined index: baz');
+            self::expectException('\ErrorException');
+            self::expectExceptionMessage('Undefined index: baz');
         }
 
-        $array = array('foo' => 'bar');
-        // @phpstan-ignore-next-line
+        $array = ['foo' => 'bar'];
+        // @phpstan-ignore offsetAccess.notFound, expr.resultUnused
         $array['baz'];
     }
 
     /**
      * Test ErrorHandler handles warnings
      */
-    public function testErrorHandlerCaptureWarning()
+    public function testErrorHandlerCaptureWarning(): void
     {
-        if (PHP_VERSION_ID >= 80000) {
-            $this->setExpectedException('TypeError', 'array_merge');
+        if (\PHP_VERSION_ID >= 80000) {
+            self::expectException('TypeError');
+            self::expectExceptionMessage('array_merge');
         } else {
-            $this->setExpectedException('ErrorException', 'array_merge');
+            self::expectException('ErrorException');
+            self::expectExceptionMessage('array_merge');
         }
 
-        // @phpstan-ignore-next-line
-        array_merge(array(), 'string');
+        // @phpstan-ignore function.resultUnused, argument.type
+        array_merge([], 'string');
     }
 
     /**
      * Test ErrorHandler handles warnings
      * @doesNotPerformAssertions
      */
-    public function testErrorHandlerRespectsAtOperator()
+    public function testErrorHandlerRespectsAtOperator(): void
     {
         @trigger_error('test', E_USER_NOTICE);
     }

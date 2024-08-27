@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -33,16 +33,17 @@ class ArchivableFilesFinderTest extends TestCase
      */
     protected $fs;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         $fs = new Filesystem;
         $this->fs = $fs;
 
         $this->sources = $fs->normalizePath(
-            $this->getUniqueTmpDirectory()
+            self::getUniqueTmpDirectory()
         );
 
-        $fileTree = array(
+        $fileTree = [
+            '.foo',
             'A/prefixA.foo',
             'A/prefixB.foo',
             'A/prefixC.foo',
@@ -86,7 +87,7 @@ class ArchivableFilesFinderTest extends TestCase
             '!important!.txt',
             '!important_too!.txt',
             '#weirdfile',
-        );
+        ];
 
         foreach ($fileTree as $relativePath) {
             $path = $this->sources.'/'.$relativePath;
@@ -95,25 +96,27 @@ class ArchivableFilesFinderTest extends TestCase
         }
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
+        parent::tearDown();
         $fs = new Filesystem;
         $fs->removeDirectory($this->sources);
     }
 
-    public function testManualExcludes()
+    public function testManualExcludes(): void
     {
-        $excludes = array(
+        $excludes = [
             'prefixB.foo',
             '!/prefixB.foo',
             '/prefixA.foo',
             'prefixC.*',
             '!*/*/*/prefixC.foo',
-        );
+            '.*',
+        ];
 
         $this->finder = new ArchivableFilesFinder($this->sources, $excludes);
 
-        $this->assertArchivableFiles(array(
+        self::assertArchivableFiles([
             '/!important!.txt',
             '/!important_too!.txt',
             '/#weirdfile',
@@ -150,14 +153,14 @@ class ArchivableFilesFinderTest extends TestCase
             '/prefixF.foo',
             '/toplevelA.foo',
             '/toplevelB.foo',
-        ));
+        ]);
     }
 
-    public function testGitExcludes()
+    public function testGitExcludes(): void
     {
         $this->skipIfNotExecutable('git');
 
-        file_put_contents($this->sources.'/.gitattributes', implode("\n", array(
+        file_put_contents($this->sources.'/.gitattributes', implode("\n", [
             '',
             '# gitattributes rules with comments and blank lines',
             'prefixB.foo export-ignore',
@@ -184,11 +187,11 @@ class ArchivableFilesFinderTest extends TestCase
             'parameters.yml export-ignore',
             '\!important!.txt export-ignore',
             '\#* export-ignore',
-        )));
+        ]));
 
-        $this->finder = new ArchivableFilesFinder($this->sources, array());
+        $this->finder = new ArchivableFilesFinder($this->sources, []);
 
-        $this->assertArchivableFiles($this->getArchivedFiles(
+        self::assertArchivableFiles($this->getArchivedFiles(
             'git init && '.
             'git config user.email "you@example.com" && '.
             'git config user.name "Your Name" && '.
@@ -201,18 +204,19 @@ class ArchivableFilesFinderTest extends TestCase
         ));
     }
 
-    public function testSkipExcludes()
+    public function testSkipExcludes(): void
     {
-        $excludes = array(
+        $excludes = [
             'prefixB.foo',
-        );
+        ];
 
         $this->finder = new ArchivableFilesFinder($this->sources, $excludes, true);
 
-        $this->assertArchivableFiles(array(
+        self::assertArchivableFiles([
             '/!important!.txt',
             '/!important_too!.txt',
             '/#weirdfile',
+            '/.foo',
             '/A/prefixA.foo',
             '/A/prefixB.foo',
             '/A/prefixC.foo',
@@ -253,15 +257,15 @@ class ArchivableFilesFinderTest extends TestCase
             '/prefixF.foo',
             '/toplevelA.foo',
             '/toplevelB.foo',
-        ));
+        ]);
     }
 
     /**
      * @return string[]
      */
-    protected function getArchivableFiles()
+    protected function getArchivableFiles(): array
     {
-        $files = array();
+        $files = [];
         foreach ($this->finder as $file) {
             if (!$file->isDir()) {
                 $files[] = Preg::replace('#^'.preg_quote($this->sources, '#').'#', '', $this->fs->normalizePath($file->getRealPath()));
@@ -274,26 +278,19 @@ class ArchivableFilesFinderTest extends TestCase
     }
 
     /**
-     * @param string $command
-     *
      * @return string[]
      */
-    protected function getArchivedFiles($command)
+    protected function getArchivedFiles(string $command): array
     {
-        if (method_exists('Symfony\Component\Process\Process', 'fromShellCommandline')) {
-            $process = Process::fromShellCommandline($command, $this->sources);
-        } else {
-            // @phpstan-ignore-next-line symfony/process 2.8 accepts a string but not 5.3 which is used only for PHPStan
-            $process = new Process($command, $this->sources);
-        }
+        $process = Process::fromShellCommandline($command, $this->sources);
         $process->run();
 
         $archive = new \PharData($this->sources.'/archive.zip');
         $iterator = new \RecursiveIteratorIterator($archive);
 
-        $files = array();
+        $files = [];
         foreach ($iterator as $file) {
-            $files[] = Preg::replace('#^phar://'.preg_quote($this->sources, '#').'/archive\.zip/archive#', '', $this->fs->normalizePath($file));
+            $files[] = Preg::replace('#^phar://'.preg_quote($this->sources, '#').'/archive\.zip/archive#', '', $this->fs->normalizePath((string) $file));
         }
 
         unset($archive, $iterator, $file);
@@ -304,13 +301,11 @@ class ArchivableFilesFinderTest extends TestCase
 
     /**
      * @param string[] $expectedFiles
-     *
-     * @return void
      */
-    protected function assertArchivableFiles($expectedFiles)
+    protected function assertArchivableFiles(array $expectedFiles): void
     {
         $actualFiles = $this->getArchivableFiles();
 
-        $this->assertEquals($expectedFiles, $actualFiles);
+        self::assertEquals($expectedFiles, $actualFiles);
     }
 }

@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -20,21 +20,20 @@ class GitExcludeFilterTest extends TestCase
     /**
      * @dataProvider providePatterns
      *
-     * @param string  $ignore
      * @param mixed[] $expected
      */
-    public function testPatternEscape($ignore, $expected)
+    public function testPatternEscape(string $ignore, array $expected): void
     {
         $filter = new GitExcludeFilter('/');
 
-        $this->assertEquals($expected, $filter->parseGitAttributesLine($ignore));
+        self::assertEquals($expected, $filter->parseGitAttributesLine($ignore));
     }
 
-    public function providePatterns()
+    public static function providePatterns(): array
     {
-        return array(
-            array('app/config/parameters.yml export-ignore', array('{(?=[^\.])app/(?=[^\.])config/(?=[^\.])parameters\.yml(?=$|/)}', false, false)),
-            array('app/config/parameters.yml -export-ignore', array('{(?=[^\.])app/(?=[^\.])config/(?=[^\.])parameters\.yml(?=$|/)}', true, false)),
-        );
+        return [
+            ['app/config/parameters.yml export-ignore', ['{(?=[^\.])app/(?=[^\.])config/(?=[^\.])parameters\.yml(?=$|/)}', false, false]],
+            ['app/config/parameters.yml -export-ignore', ['{(?=[^\.])app/(?=[^\.])config/(?=[^\.])parameters\.yml(?=$|/)}', true, false]],
+        ];
     }
 }

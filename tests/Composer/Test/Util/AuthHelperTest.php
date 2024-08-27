@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -31,7 +31,7 @@ class AuthHelperTest extends TestCase
     /** @var AuthHelper */
     private $authHelper;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         $this->io = $this
             ->getMockBuilder('Composer\IO\IOInterface')
@@ -43,12 +43,12 @@ class AuthHelperTest extends TestCase
         $this->authHelper = new AuthHelper($this->io, $this->config);
     }
 
-    public function testAddAuthenticationHeaderWithoutAuthCredentials()
+    public function testAddAuthenticationHeaderWithoutAuthCredentials(): void
     {
-        $headers = array(
+        $headers = [
             'Accept-Encoding: gzip',
             'Connection: close',
-        );
+        ];
         $origin = 'http://example.org';
         $url = 'file://' . __FILE__;
 
@@ -57,47 +57,47 @@ class AuthHelperTest extends TestCase
             ->with($origin)
             ->willReturn(false);
 
-        $this->assertSame(
+        self::assertSame(
             $headers,
             $this->authHelper->addAuthenticationHeader($headers, $origin, $url)
         );
     }
 
-    public function testAddAuthenticationHeaderWithBearerPassword()
+    public function testAddAuthenticationHeaderWithBearerPassword(): void
     {
-        $headers = array(
+        $headers = [
             'Accept-Encoding: gzip',
             'Connection: close',
-        );
+        ];
         $origin = 'http://example.org';
         $url = 'file://' . __FILE__;
-        $auth = array(
+        $auth = [
             'username' => 'my_username',
             'password' => 'bearer',
-        );
+        ];
 
         $this->expectsAuthentication($origin, $auth);
 
-        $expectedHeaders = array_merge($headers, array('Authorization: Bearer ' . $auth['username']));
+        $expectedHeaders = array_merge($headers, ['Authorization: Bearer ' . $auth['username']]);
 
-        $this->assertSame(
+        self::assertSame(
             $expectedHeaders,
             $this->authHelper->addAuthenticationHeader($headers, $origin, $url)
         );
     }
 
-    public function testAddAuthenticationHeaderWithGithubToken()
+    public function testAddAuthenticationHeaderWithGithubToken(): void
     {
-        $headers = array(
+        $headers = [
             'Accept-Encoding: gzip',
             'Connection: close',
-        );
+        ];
         $origin = 'github.com';
         $url = 'https://api.github.com/';
-        $auth = array(
+        $auth = [
             'username' => 'my_username',
             'password' => 'x-oauth-basic',
-        );
+        ];
 
         $this->expectsAuthentication($origin, $auth);
 
@@ -105,213 +105,207 @@ class AuthHelperTest extends TestCase
             ->method('writeError')
             ->with('Using GitHub token authentication', true, IOInterface::DEBUG);
 
-        $expectedHeaders = array_merge($headers, array('Authorization: token ' . $auth['username']));
+        $expectedHeaders = array_merge($headers, ['Authorization: token ' . $auth['username']]);
 
-        $this->assertSame(
+        self::assertSame(
             $expectedHeaders,
             $this->authHelper->addAuthenticationHeader($headers, $origin, $url)
         );
     }
 
-    public function testAddAuthenticationHeaderWithGitlabOathToken()
+    public function testAddAuthenticationHeaderWithGitlabOathToken(): void
     {
-        $headers = array(
+        $headers = [
             'Accept-Encoding: gzip',
             'Connection: close',
-        );
+        ];
         $origin = 'gitlab.com';
         $url = 'https://api.gitlab.com/';
-        $auth = array(
+        $auth = [
             'username' => 'my_username',
             'password' => 'oauth2',
-        );
+        ];
 
         $this->expectsAuthentication($origin, $auth);
 
         $this->config->expects($this->once())
             ->method('get')
             ->with('gitlab-domains')
-            ->willReturn(array($origin));
+            ->willReturn([$origin]);
 
         $this->io->expects($this->once())
             ->method('writeError')
             ->with('Using GitLab OAuth token authentication', true, IOInterface::DEBUG);
 
-        $expectedHeaders = array_merge($headers, array('Authorization: Bearer ' . $auth['username']));
+        $expectedHeaders = array_merge($headers, ['Authorization: Bearer ' . $auth['username']]);
 
-        $this->assertSame(
+        self::assertSame(
             $expectedHeaders,
             $this->authHelper->addAuthenticationHeader($headers, $origin, $url)
         );
     }
 
-    public function gitlabPrivateTokenProvider()
+    public static function gitlabPrivateTokenProvider(): array
     {
-        return array(
-          array('private-token'),
-          array('gitlab-ci-token'),
-        );
+        return [
+          ['private-token'],
+          ['gitlab-ci-token'],
+        ];
     }
 
     /**
      * @dataProvider gitlabPrivateTokenProvider
-     *
-     * @param string $password
      */
-    public function testAddAuthenticationHeaderWithGitlabPrivateToken($password)
+    public function testAddAuthenticationHeaderWithGitlabPrivateToken(string $password): void
     {
-        $headers = array(
+        $headers = [
             'Accept-Encoding: gzip',
             'Connection: close',
-        );
+        ];
         $origin = 'gitlab.com';
         $url = 'https://api.gitlab.com/';
-        $auth = array(
+        $auth = [
             'username' => 'my_username',
             'password' => $password,
-        );
+        ];
 
         $this->expectsAuthentication($origin, $auth);
 
         $this->config->expects($this->once())
             ->method('get')
             ->with('gitlab-domains')
-            ->willReturn(array($origin));
+            ->willReturn([$origin]);
 
         $this->io->expects($this->once())
             ->method('writeError')
             ->with('Using GitLab private token authentication', true, IOInterface::DEBUG);
 
-        $expectedHeaders = array_merge($headers, array('PRIVATE-TOKEN: ' . $auth['username']));
+        $expectedHeaders = array_merge($headers, ['PRIVATE-TOKEN: ' . $auth['username']]);
 
-        $this->assertSame(
+        self::assertSame(
             $expectedHeaders,
             $this->authHelper->addAuthenticationHeader($headers, $origin, $url)
         );
     }
 
-    public function testAddAuthenticationHeaderWithBitbucketOathToken()
+    public function testAddAuthenticationHeaderWithBitbucketOathToken(): void
     {
-        $headers = array(
+        $headers = [
             'Accept-Encoding: gzip',
             'Connection: close',
-        );
+        ];
         $origin = 'bitbucket.org';
         $url = 'https://bitbucket.org/site/oauth2/authorize';
-        $auth = array(
+        $auth = [
             'username' => 'x-token-auth',
             'password' => 'my_password',
-        );
+        ];
 
         $this->expectsAuthentication($origin, $auth);
 
         $this->config->expects($this->once())
             ->method('get')
             ->with('gitlab-domains')
-            ->willReturn(array());
+            ->willReturn([]);
 
         $this->io->expects($this->once())
             ->method('writeError')
             ->with('Using Bitbucket OAuth token authentication', true, IOInterface::DEBUG);
 
-        $expectedHeaders = array_merge($headers, array('Authorization: Bearer ' . $auth['password']));
+        $expectedHeaders = array_merge($headers, ['Authorization: Bearer ' . $auth['password']]);
 
-        $this->assertSame(
+        self::assertSame(
             $expectedHeaders,
             $this->authHelper->addAuthenticationHeader($headers, $origin, $url)
         );
     }
 
-    public function bitbucketPublicUrlProvider()
+    public static function bitbucketPublicUrlProvider(): array
     {
-        return array(
-            array('https://bitbucket.org/user/repo/downloads/whatever'),
-            array('https://bbuseruploads.s3.amazonaws.com/9421ee72-638e-43a9-82ea-39cfaae2bfaa/downloads/b87c59d9-54f3-4922-b711-d89059ec3bcf'),
-        );
+        return [
+            ['https://bitbucket.org/user/repo/downloads/whatever'],
+            ['https://bbuseruploads.s3.amazonaws.com/9421ee72-638e-43a9-82ea-39cfaae2bfaa/downloads/b87c59d9-54f3-4922-b711-d89059ec3bcf'],
+        ];
     }
 
     /**
      * @dataProvider bitbucketPublicUrlProvider
-     *
-     * @param string $url
      */
-    public function testAddAuthenticationHeaderWithBitbucketPublicUrl($url)
+    public function testAddAuthenticationHeaderWithBitbucketPublicUrl(string $url): void
     {
-        $headers = array(
+        $headers = [
             'Accept-Encoding: gzip',
             'Connection: close',
-        );
+        ];
         $origin = 'bitbucket.org';
-        $auth = array(
+        $auth = [
             'username' => 'x-token-auth',
             'password' => 'my_password',
-        );
+        ];
 
         $this->expectsAuthentication($origin, $auth);
 
         $this->config->expects($this->once())
             ->method('get')
             ->with('gitlab-domains')
-            ->willReturn(array());
+            ->willReturn([]);
 
-        $this->assertSame(
+        self::assertSame(
             $headers,
             $this->authHelper->addAuthenticationHeader($headers, $origin, $url)
         );
     }
 
-    public function basicHttpAuthenticationProvider()
+    public static function basicHttpAuthenticationProvider(): array
     {
-        return array(
-            array(
+        return [
+            [
                 Bitbucket::OAUTH2_ACCESS_TOKEN_URL,
                 'bitbucket.org',
-                array(
+                [
                     'username' => 'x-token-auth',
                     'password' => 'my_password',
-                ),
-            ),
-            array(
+                ],
+            ],
+            [
                 'https://some-api.url.com',
                 'some-api.url.com',
-                array(
+                [
                     'username' => 'my_username',
                     'password' => 'my_password',
-                ),
-            ),
-            array(
+                ],
+            ],
+            [
                 'https://gitlab.com',
                 'gitlab.com',
-                array(
+                [
                     'username' => 'my_username',
                     'password' => 'my_password',
-                ),
-            ),
-        );
+                ],
+            ],
+        ];
     }
 
     /**
      * @dataProvider basicHttpAuthenticationProvider
      *
-     * @param string                                                      $url
-     * @param string                                                      $origin
      * @param array<string, string|null>                                  $auth
      *
      * @phpstan-param array{username: string|null, password: string|null} $auth
      */
-    public function testAddAuthenticationHeaderWithBasicHttpAuthentication($url, $origin, $auth)
+    public function testAddAuthenticationHeaderWithBasicHttpAuthentication(string $url, string $origin, array $auth): void
     {
-        $headers = array(
+        $headers = [
             'Accept-Encoding: gzip',
             'Connection: close',
-        );
+        ];
 
         $this->expectsAuthentication($origin, $auth);
 
         $this->config->expects($this->once())
             ->method('get')
             ->with('gitlab-domains')
-            ->willReturn(array($origin));
+            ->willReturn([$origin]);
 
         $this->io->expects($this->once())
             ->method('writeError')
@@ -323,10 +317,10 @@ class AuthHelperTest extends TestCase
 
         $expectedHeaders = array_merge(
             $headers,
-            array('Authorization: Basic ' . base64_encode($auth['username'] . ':' . $auth['password']))
+            ['Authorization: Basic ' . base64_encode($auth['username'] . ':' . $auth['password'])]
         );
 
-        $this->assertSame(
+        self::assertSame(
             $expectedHeaders,
             $this->authHelper->addAuthenticationHeader($headers, $origin, $url)
         );
@@ -334,31 +328,29 @@ class AuthHelperTest extends TestCase
 
     /**
      * @dataProvider bitbucketPublicUrlProvider
-     *
-     * @param string $url
      */
-    public function testIsPublicBitBucketDownloadWithBitbucketPublicUrl($url)
+    public function testIsPublicBitBucketDownloadWithBitbucketPublicUrl(string $url): void
     {
-        $this->assertTrue($this->authHelper->isPublicBitBucketDownload($url));
+        self::assertTrue($this->authHelper->isPublicBitBucketDownload($url));
     }
 
-    public function testIsPublicBitBucketDownloadWithNonBitbucketPublicUrl()
+    public function testIsPublicBitBucketDownloadWithNonBitbucketPublicUrl(): void
     {
-        $this->assertFalse(
+        self::assertFalse(
             $this->authHelper->isPublicBitBucketDownload(
                 'https://bitbucket.org/site/oauth2/authorize'
             )
         );
     }
 
-    public function testStoreAuthAutomatically()
+    public function testStoreAuthAutomatically(): void
     {
         $origin = 'github.com';
         $storeAuth = true;
-        $auth = array(
+        $auth = [
             'username' => 'my_username',
             'password' => 'my_password',
-        );
+        ];
 
         /** @var \Composer\Config\ConfigSourceInterface&\PHPUnit\Framework\MockObject\MockObject $configSource */
         $configSource = $this
@@ -377,20 +369,19 @@ class AuthHelperTest extends TestCase
 
         $configSource->expects($this->once())
             ->method('addConfigSetting')
-            ->with('http-basic.'.$origin, $auth)
-            ->willReturn($configSource);
+            ->with('http-basic.'.$origin, $auth);
 
         $this->authHelper->storeAuth($origin, $storeAuth);
     }
 
-    public function testStoreAuthWithPromptYesAnswer()
+    public function testStoreAuthWithPromptYesAnswer(): void
     {
         $origin = 'github.com';
         $storeAuth = 'prompt';
-        $auth = array(
+        $auth = [
             'username' => 'my_username',
             'password' => 'my_password',
-        );
+        ];
         $answer = 'y';
         $configSourceName = 'https://api.gitlab.com/source';
 
@@ -416,7 +407,7 @@ class AuthHelperTest extends TestCase
                 null,
                 'y'
             )
-            ->willReturnCallback(function ($question, $validator, $attempts, $default) use ($answer) {
+            ->willReturnCallback(static function ($question, $validator, $attempts, $default) use ($answer): string {
                 $validator($answer);
 
                 return $answer;
@@ -429,13 +420,12 @@ class AuthHelperTest extends TestCase
 
         $configSource->expects($this->once())
             ->method('addConfigSetting')
-            ->with('http-basic.'.$origin, $auth)
-            ->willReturn($configSource);
+            ->with('http-basic.'.$origin, $auth);
 
         $this->authHelper->storeAuth($origin, $storeAuth);
     }
 
-    public function testStoreAuthWithPromptNoAnswer()
+    public function testStoreAuthWithPromptNoAnswer(): void
     {
         $origin = 'github.com';
         $storeAuth = 'prompt';
@@ -464,7 +454,7 @@ class AuthHelperTest extends TestCase
                 null,
                 'y'
             )
-            ->willReturnCallback(function ($question, $validator, $attempts, $default) use ($answer) {
+            ->willReturnCallback(static function ($question, $validator, $attempts, $default) use ($answer): string {
                 $validator($answer);
 
                 return $answer;
@@ -473,9 +463,9 @@ class AuthHelperTest extends TestCase
         $this->authHelper->storeAuth($origin, $storeAuth);
     }
 
-    public function testStoreAuthWithPromptInvalidAnswer()
+    public function testStoreAuthWithPromptInvalidAnswer(): void
     {
-        $this->setExpectedException('RuntimeException');
+        self::expectException('RuntimeException');
 
         $origin = 'github.com';
         $storeAuth = 'prompt';
@@ -504,7 +494,7 @@ class AuthHelperTest extends TestCase
                 null,
                 'y'
             )
-            ->willReturnCallback(function ($question, $validator, $attempts, $default) use ($answer) {
+            ->willReturnCallback(static function ($question, $validator, $attempts, $default) use ($answer): string {
                 $validator($answer);
 
                 return $answer;
@@ -513,15 +503,112 @@ class AuthHelperTest extends TestCase
         $this->authHelper->storeAuth($origin, $storeAuth);
     }
 
+    public function testPromptAuthIfNeededGitLabNoAuthChange(): void
+    {
+        self::expectException('Composer\Downloader\TransportException');
+
+        $origin = 'gitlab.com';
+
+        $this->io
+            ->method('hasAuthentication')
+            ->with($origin)
+            ->willReturn(true);
+
+        $this->io
+            ->method('getAuthentication')
+            ->with($origin)
+            ->willReturn([
+                'username' => 'gitlab-user',
+                'password' => 'gitlab-password',
+            ]);
+
+        $this->io
+            ->expects($this->once())
+            ->method('setAuthentication')
+            ->with('gitlab.com', 'gitlab-user', 'gitlab-password');
+
+        $this->config
+            ->method('get')
+            ->willReturnMap([
+                ['github-domains', 0, []],
+                ['gitlab-domains', 0, ['gitlab.com']],
+                ['gitlab-token', 0, ['gitlab.com' => ['username' => 'gitlab-user', 'token' => 'gitlab-password']]],
+            ]);
+
+        $this->authHelper->promptAuthIfNeeded('https://gitlab.com/acme/archive.zip', $origin, 404, 'GitLab requires authentication and it was not provided');
+    }
+
+    public function testPromptAuthIfNeededMultipleBitbucketDownloads(): void
+    {
+        $origin = 'bitbucket.org';
+
+        $expectedResult = [
+            'retry' => true,
+            'storeAuth' => false,
+        ];
+
+        $authConfig = [
+            'bitbucket.org' => [
+                'access-token' => 'bitbucket_access_token',
+                'access-token-expiration' => time() + 1800,
+            ]
+        ];
+
+        $this->config
+            ->method('get')
+            ->willReturnMap([
+                ['github-domains', 0, []],
+                ['gitlab-domains', 0, []],
+                ['bitbucket-oauth', 0, $authConfig],
+                ['github-domains', 0, []],
+                ['gitlab-domains', 0, []],
+            ]);
+
+        $this->io
+            ->expects($this->exactly(2))
+            ->method('hasAuthentication')
+            ->with($origin)
+            ->willReturn(true);
+
+        $getAuthenticationReturnValues = [
+            ['username' => 'bitbucket_client_id', 'password' => 'bitbucket_client_secret'],
+            ['username' => 'x-token-auth', 'password' => 'bitbucket_access_token'],
+        ];
+
+        $this->io
+            ->expects($this->exactly(2))
+            ->method('getAuthentication')
+            ->willReturnCallback(
+                function ($repositoryName) use (&$getAuthenticationReturnValues) {
+                    return array_shift($getAuthenticationReturnValues);
+                }
+            );
+
+        $this->io
+            ->expects($this->once())
+            ->method('setAuthentication')
+            ->with($origin, 'x-token-auth', 'bitbucket_access_token');
+
+        $result1 = $this->authHelper->promptAuthIfNeeded('https://bitbucket.org/workspace/repo1/get/hash1.zip', $origin, 401, 'HTTP/2 401 ');
+        $result2 = $this->authHelper->promptAuthIfNeeded('https://bitbucket.org/workspace/repo2/get/hash2.zip', $origin, 401, 'HTTP/2 401 ');
+
+        self::assertSame(
+            $expectedResult,
+            $result1
+        );
+
+        self::assertSame(
+            $expectedResult,
+            $result2
+        );
+    }
+
     /**
-     * @param string                     $origin
      * @param array<string, string|null> $auth
-     *
-     * @return void
      *
      * @phpstan-param array{username: string|null, password: string|null} $auth
      */
-    private function expectsAuthentication($origin, $auth)
+    private function expectsAuthentication(string $origin, array $auth): void
     {
         $this->io->expects($this->once())
             ->method('hasAuthentication')

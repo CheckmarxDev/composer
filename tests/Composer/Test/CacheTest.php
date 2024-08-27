@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -17,7 +17,7 @@ use Composer\Util\Filesystem;
 
 class CacheTest extends TestCase
 {
-    /** @var string[] */
+    /** @var array<\SplFileInfo> */
     private $files;
     /** @var string */
     private $root;
@@ -28,10 +28,10 @@ class CacheTest extends TestCase
     /** @var Cache&\PHPUnit\Framework\MockObject\MockObject */
     private $cache;
 
-    public function setUp()
+    public function setUp(): void
     {
-        $this->root = $this->getUniqueTmpDirectory();
-        $this->files = array();
+        $this->root = self::getUniqueTmpDirectory();
+        $this->files = [];
         $zeros = str_repeat('0', 1000);
 
         for ($i = 0; $i < 4; $i++) {
@@ -44,8 +44,8 @@ class CacheTest extends TestCase
 
         $io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
         $this->cache = $this->getMockBuilder('Composer\Cache')
-            ->setMethods(array('getFinder'))
-            ->setConstructorArgs(array($io, $this->root))
+            ->onlyMethods(['getFinder'])
+            ->setConstructorArgs([$io, $this->root])
             ->getMock();
         $this->cache
             ->expects($this->any())
@@ -53,15 +53,16 @@ class CacheTest extends TestCase
             ->will($this->returnValue($this->finder));
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
+        parent::tearDown();
         if (is_dir($this->root)) {
             $fs = new Filesystem;
             $fs->removeDirectory($this->root);
         }
     }
 
-    public function testRemoveOutdatedFiles()
+    public function testRemoveOutdatedFiles(): void
     {
         $outdated = array_slice($this->files, 1);
         $this->finder
@@ -76,12 +77,12 @@ class CacheTest extends TestCase
         $this->cache->gc(600, 1024 * 1024 * 1024);
 
         for ($i = 1; $i < 4; $i++) {
-            $this->assertFileDoesNotExist("{$this->root}/cached.file{$i}.zip");
+            self::assertFileDoesNotExist("{$this->root}/cached.file{$i}.zip");
         }
-        $this->assertFileExists("{$this->root}/cached.file0.zip");
+        self::assertFileExists("{$this->root}/cached.file0.zip");
     }
 
-    public function testRemoveFilesWhenCacheIsTooLarge()
+    public function testRemoveFilesWhenCacheIsTooLarge(): void
     {
         $emptyFinder = $this->getMockBuilder('Symfony\Component\Finder\Finder')->disableOriginalConstructor()->getMock();
         $emptyFinder
@@ -105,15 +106,15 @@ class CacheTest extends TestCase
         $this->cache->gc(600, 1500);
 
         for ($i = 0; $i < 3; $i++) {
-            $this->assertFileDoesNotExist("{$this->root}/cached.file{$i}.zip");
+            self::assertFileDoesNotExist("{$this->root}/cached.file{$i}.zip");
         }
-        $this->assertFileExists("{$this->root}/cached.file3.zip");
+        self::assertFileExists("{$this->root}/cached.file3.zip");
     }
 
-    public function testClearCache()
+    public function testClearCache(): void
     {
         $io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
         $cache = new Cache($io, $this->root, 'a-z0-9.', $this->filesystem);
-        $this->assertTrue($cache->clear());
+        self::assertTrue($cache->clear());
     }
 }

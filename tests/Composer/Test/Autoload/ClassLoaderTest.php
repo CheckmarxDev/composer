@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -27,14 +27,14 @@ class ClassLoaderTest extends TestCase
      *
      * @param string $class The fully-qualified class name to test, without preceding namespace separator.
      */
-    public function testLoadClass($class)
+    public function testLoadClass(string $class): void
     {
         $loader = new ClassLoader();
         $loader->add('Namespaced\\', __DIR__ . '/Fixtures');
         $loader->add('Pearlike_', __DIR__ . '/Fixtures');
         $loader->addPsr4('ShinyVendor\\ShinyPackage\\', __DIR__ . '/Fixtures');
         $loader->loadClass($class);
-        $this->assertTrue(class_exists($class, false), "->loadClass() loads '$class'");
+        self::assertTrue(class_exists($class, false), "->loadClass() loads '$class'");
     }
 
     /**
@@ -42,21 +42,44 @@ class ClassLoaderTest extends TestCase
      *
      * @return array<array<string>> Array of parameter sets to test with.
      */
-    public function getLoadClassTests()
+    public static function getLoadClassTests(): array
     {
-        return array(
-            array('Namespaced\\Foo'),
-            array('Pearlike_Foo'),
-            array('ShinyVendor\\ShinyPackage\\SubNamespace\\Foo'),
-        );
+        return [
+            ['Namespaced\\Foo'],
+            ['Pearlike_Foo'],
+            ['ShinyVendor\\ShinyPackage\\SubNamespace\\Foo'],
+        ];
     }
 
     /**
      * getPrefixes method should return empty array if ClassLoader does not have any psr-0 configuration
      */
-    public function testGetPrefixesWithNoPSR0Configuration()
+    public function testGetPrefixesWithNoPSR0Configuration(): void
     {
         $loader = new ClassLoader();
-        $this->assertEmpty($loader->getPrefixes());
+        self::assertEmpty($loader->getPrefixes());
+    }
+
+    public function testSerializability(): void
+    {
+        $loader = new ClassLoader();
+        $loader->add('Pearlike_', __DIR__ . '/Fixtures');
+        $loader->add('', __DIR__ . '/FALLBACK');
+        $loader->addPsr4('ShinyVendor\\ShinyPackage\\', __DIR__ . '/Fixtures');
+        $loader->addPsr4('', __DIR__ . '/FALLBACKPSR4');
+        $loader->addClassMap(['A' => '', 'B' => 'path']);
+        $loader->setApcuPrefix('prefix');
+        $loader->setClassMapAuthoritative(true);
+        $loader->setUseIncludePath(true);
+
+        $loader2 = unserialize(serialize($loader));
+        self::assertInstanceOf(ClassLoader::class, $loader2);
+        self::assertSame($loader->getApcuPrefix(), $loader2->getApcuPrefix());
+        self::assertSame($loader->getClassMap(), $loader2->getClassMap());
+        self::assertSame($loader->getFallbackDirs(), $loader2->getFallbackDirs());
+        self::assertSame($loader->getFallbackDirsPsr4(), $loader2->getFallbackDirsPsr4());
+        self::assertSame($loader->getPrefixes(), $loader2->getPrefixes());
+        self::assertSame($loader->getPrefixesPsr4(), $loader2->getPrefixesPsr4());
+        self::assertSame($loader->getUseIncludePath(), $loader2->getUseIncludePath());
     }
 }

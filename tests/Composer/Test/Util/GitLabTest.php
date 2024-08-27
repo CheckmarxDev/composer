@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -12,9 +12,7 @@
 
 namespace Composer\Test\Util;
 
-use Composer\Downloader\TransportException;
 use Composer\Util\GitLab;
-use Composer\Util\Http\Response;
 use Composer\Test\TestCase;
 
 /**
@@ -32,38 +30,23 @@ class GitLabTest extends TestCase
     private $origin = 'gitlab.com';
     /** @var string */
     private $token = 'gitlabtoken';
+    /** @var string */
+    private $refreshtoken = 'gitlabrefreshtoken';
 
-    public function testUsernamePasswordAuthenticationFlow()
+    public function testUsernamePasswordAuthenticationFlow(): void
     {
         $io = $this->getIOMock();
-        $io
-            ->expects($this->at(0))
-            ->method('writeError')
-            ->with($this->message)
-        ;
-        $io
-            ->expects($this->once())
-            ->method('ask')
-            ->with('Username: ')
-            ->willReturn($this->username)
-        ;
-        $io
-            ->expects($this->once())
-            ->method('askAndHideAnswer')
-            ->with('Password: ')
-            ->willReturn($this->password)
-        ;
+        $io->expects([
+            ['text' => $this->message],
+            ['ask' => 'Username: ', 'reply' => $this->username],
+            ['ask' => 'Password: ', 'reply' => $this->password],
+        ]);
 
         $httpDownloader = $this->getHttpDownloaderMock();
-        $httpDownloader
-            ->expects($this->once())
-            ->method('get')
-            ->with(
-                $this->equalTo($url = sprintf('http://%s/oauth/token', $this->origin)),
-                $this->anything()
-            )
-            ->willReturn(new Response(array('url' => $url), 200, array(), sprintf('{"access_token": "%s", "token_type": "bearer", "expires_in": 7200}', $this->token)))
-        ;
+        $httpDownloader->expects(
+            [['url' => sprintf('http://%s/oauth/token', $this->origin), 'body' => sprintf('{"access_token": "%s", "refresh_token": "%s", "token_type": "bearer", "expires_in": 7200, "created_at": 0}', $this->token, $this->refreshtoken)]],
+            true
+        );
 
         $config = $this->getConfigMock();
         $config
@@ -74,33 +57,38 @@ class GitLabTest extends TestCase
 
         $gitLab = new GitLab($io, $config, null, $httpDownloader);
 
-        $this->assertTrue($gitLab->authorizeOAuthInteractively('http', $this->origin, $this->message));
+        self::assertTrue($gitLab->authorizeOAuthInteractively('http', $this->origin, $this->message));
     }
 
-    public function testUsernamePasswordFailure()
+    public function testUsernamePasswordFailure(): void
     {
-        $this->setExpectedException('RuntimeException', 'Invalid GitLab credentials 5 times in a row, aborting.');
+        self::expectException('RuntimeException');
+        self::expectExceptionMessage('Invalid GitLab credentials 5 times in a row, aborting.');
         $io = $this->getIOMock();
-        $io
-            ->expects($this->exactly(5))
-            ->method('ask')
-            ->with('Username: ')
-            ->willReturn($this->username)
-        ;
-        $io
-            ->expects($this->exactly(5))
-            ->method('askAndHideAnswer')
-            ->with('Password: ')
-            ->willReturn($this->password)
-        ;
+        $io->expects([
+            ['ask' => 'Username: ', 'reply' => $this->username],
+            ['ask' => 'Password: ', 'reply' => $this->password],
+            ['ask' => 'Username: ', 'reply' => $this->username],
+            ['ask' => 'Password: ', 'reply' => $this->password],
+            ['ask' => 'Username: ', 'reply' => $this->username],
+            ['ask' => 'Password: ', 'reply' => $this->password],
+            ['ask' => 'Username: ', 'reply' => $this->username],
+            ['ask' => 'Password: ', 'reply' => $this->password],
+            ['ask' => 'Username: ', 'reply' => $this->username],
+            ['ask' => 'Password: ', 'reply' => $this->password],
+        ]);
 
         $httpDownloader = $this->getHttpDownloaderMock();
-        $httpDownloader
-            ->expects($this->exactly(5))
-            ->method('get')
-            ->will($this->throwException($e = new TransportException('', 401)))
-        ;
-        $e->setResponse('{}');
+        $httpDownloader->expects(
+            [
+                ['url' => 'https://gitlab.com/oauth/token', 'status' => 401, 'body' => '{}'],
+                ['url' => 'https://gitlab.com/oauth/token', 'status' => 401, 'body' => '{}'],
+                ['url' => 'https://gitlab.com/oauth/token', 'status' => 401, 'body' => '{}'],
+                ['url' => 'https://gitlab.com/oauth/token', 'status' => 401, 'body' => '{}'],
+                ['url' => 'https://gitlab.com/oauth/token', 'status' => 401, 'body' => '{}'],
+            ],
+            true
+        );
 
         $config = $this->getConfigMock();
         $config
@@ -115,39 +103,11 @@ class GitLabTest extends TestCase
     }
 
     /**
-     * @return \PHPUnit\Framework\MockObject\MockObject&\Composer\IO\ConsoleIO
-     */
-    private function getIOMock()
-    {
-        $io = $this
-            ->getMockBuilder('Composer\IO\ConsoleIO')
-            ->disableOriginalConstructor()
-            ->getMock()
-        ;
-
-        return $io;
-    }
-
-    /**
      * @return \PHPUnit\Framework\MockObject\MockObject&\Composer\Config
      */
     private function getConfigMock()
     {
         return $this->getMockBuilder('Composer\Config')->getMock();
-    }
-
-    /**
-     * @return \PHPUnit\Framework\MockObject\MockObject&\Composer\Util\HttpDownloader
-     */
-    private function getHttpDownloaderMock()
-    {
-        $httpDownloader = $this
-            ->getMockBuilder('Composer\Util\HttpDownloader')
-            ->disableOriginalConstructor()
-            ->getMock()
-        ;
-
-        return $httpDownloader;
     }
 
     /**

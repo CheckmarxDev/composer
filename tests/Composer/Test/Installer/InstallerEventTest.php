@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -17,18 +17,16 @@ use Composer\Test\TestCase;
 
 class InstallerEventTest extends TestCase
 {
-    public function testGetter()
+    public function testGetter(): void
     {
         $composer = $this->getMockBuilder('Composer\Composer')->getMock();
         $io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
         $transaction = $this->getMockBuilder('Composer\DependencyResolver\LockTransaction')->disableOriginalConstructor()->getMock();
         $event = new InstallerEvent('EVENT_NAME', $composer, $io, true, true, $transaction);
 
-        $this->assertSame('EVENT_NAME', $event->getName());
-        $this->assertInstanceOf('Composer\Composer', $event->getComposer());
-        $this->assertInstanceOf('Composer\IO\IOInterface', $event->getIO());
-        $this->assertTrue($event->isDevMode());
-        $this->assertTrue($event->isExecutingOperations());
-        $this->assertInstanceOf('Composer\DependencyResolver\Transaction', $event->getTransaction());
+        self::assertSame('EVENT_NAME', $event->getName());
+        self::assertTrue($event->isDevMode());
+        self::assertTrue($event->isExecutingOperations());
+        self::assertInstanceOf('Composer\DependencyResolver\Transaction', $event->getTransaction());
     }
 }

@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -20,9 +20,9 @@ class BasePackageTest extends TestCase
     /**
      * @doesNotPerformAssertions
      */
-    public function testSetSameRepository()
+    public function testSetSameRepository(): void
     {
-        $package = $this->getMockForAbstractClass('Composer\Package\BasePackage', array('foo'));
+        $package = $this->getMockForAbstractClass('Composer\Package\BasePackage', ['foo']);
         $repository = $this->getMockBuilder('Composer\Repository\RepositoryInterface')->getMock();
 
         $package->setRepository($repository);
@@ -33,11 +33,11 @@ class BasePackageTest extends TestCase
         }
     }
 
-    public function testSetAnotherRepository()
+    public function testSetAnotherRepository(): void
     {
-        $this->setExpectedException('LogicException');
+        self::expectException('LogicException');
 
-        $package = $this->getMockForAbstractClass('Composer\Package\BasePackage', array('foo'));
+        $package = $this->getMockForAbstractClass('Composer\Package\BasePackage', ['foo']);
 
         $package->setRepository($this->getMockBuilder('Composer\Repository\RepositoryInterface')->getMock());
         $package->setRepository($this->getMockBuilder('Composer\Repository\RepositoryInterface')->getMock());
@@ -45,52 +45,70 @@ class BasePackageTest extends TestCase
 
     /**
      * @dataProvider provideFormattedVersions
-     *
-     * @param bool   $truncate
-     * @param string $expected
      */
-    public function testFormatVersionForDevPackage(BasePackage $package, $truncate, $expected)
+    public function testFormatVersionForDevPackage(string $sourceReference, bool $truncate, string $expected): void
     {
-        $this->assertSame($expected, $package->getFullPrettyVersion($truncate));
+        $package = $this->getMockForAbstractClass('\Composer\Package\BasePackage', [], '', false);
+        $package->expects($this->once())->method('isDev')->will($this->returnValue(true));
+        $package->expects($this->any())->method('getSourceType')->will($this->returnValue('git'));
+        $package->expects($this->once())->method('getPrettyVersion')->will($this->returnValue('PrettyVersion'));
+        $package->expects($this->any())->method('getSourceReference')->will($this->returnValue($sourceReference));
+
+        self::assertSame($expected, $package->getFullPrettyVersion($truncate));
     }
 
-    public function provideFormattedVersions()
+    public static function provideFormattedVersions(): array
     {
-        $data = array(
-            array(
+        return [
+            [
                 'sourceReference' => 'v2.1.0-RC2',
                 'truncate' => true,
                 'expected' => 'PrettyVersion v2.1.0-RC2',
-            ),
-            array(
+            ],
+            [
                 'sourceReference' => 'bbf527a27356414bfa9bf520f018c5cb7af67c77',
                 'truncate' => true,
                 'expected' => 'PrettyVersion bbf527a',
-            ),
-            array(
+            ],
+            [
                 'sourceReference' => 'v1.0.0',
                 'truncate' => false,
                 'expected' => 'PrettyVersion v1.0.0',
-            ),
-            array(
+            ],
+            [
                 'sourceReference' => 'bbf527a27356414bfa9bf520f018c5cb7af67c77',
                 'truncate' => false,
                 'expected' => 'PrettyVersion bbf527a27356414bfa9bf520f018c5cb7af67c77',
-            ),
-        );
+            ],
+        ];
+    }
 
-        $self = $this;
-        $createPackage = function ($arr) use ($self) {
-            $package = $self->getMockForAbstractClass('\Composer\Package\BasePackage', array(), '', false);
-            $package->expects($self->once())->method('isDev')->will($self->returnValue(true));
-            $package->expects($self->any())->method('getSourceType')->will($self->returnValue('git'));
-            $package->expects($self->once())->method('getPrettyVersion')->will($self->returnValue('PrettyVersion'));
-            $package->expects($self->any())->method('getSourceReference')->will($self->returnValue($arr['sourceReference']));
+    /**
+     * @param string[] $packageNames
+     * @param non-empty-string $wrap
+     *
+     * @dataProvider dataPackageNamesToRegexp
+     */
+    public function testPackageNamesToRegexp(array $packageNames, $wrap, string $expectedRegexp): void
+    {
+        $regexp = BasePackage::packageNamesToRegexp($packageNames, $wrap);
 
-            return array($package, $arr['truncate'], $arr['expected']);
-        };
+        self::assertSame($expectedRegexp, $regexp);
+    }
 
-        return array_map($createPackage, $data);
+    /**
+     * @return mixed[][]
+     */
+    public static function dataPackageNamesToRegexp(): array
+    {
+        return [
+            [
+                ['ext-*', 'monolog/monolog'], '{^%s$}i', '{^ext\-.*|monolog/monolog$}i',
+                ['php'], '{^%s$}i', '{^php$}i',
+                ['*'], '{^%s$}i', '{^.*$}i',
+                ['foo', 'bar'], '§%s§', '§foo|bar§',
+            ],
+        ];
     }
 
     /**

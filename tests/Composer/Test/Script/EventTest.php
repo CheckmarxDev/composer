@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -19,7 +19,7 @@ use Composer\Test\TestCase;
 
 class EventTest extends TestCase
 {
-    public function testEventSetsOriginatingEvent()
+    public function testEventSetsOriginatingEvent(): void
     {
         $io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
         $composer = $this->createComposerInstance();
@@ -28,22 +28,21 @@ class EventTest extends TestCase
 
         $scriptEvent = new Event('test', $composer, $io, true);
 
-        $this->assertNull(
+        self::assertNull(
             $scriptEvent->getOriginatingEvent(),
             'originatingEvent is initialized as null'
         );
 
         $scriptEvent->setOriginatingEvent($originatingEvent);
 
-        // @phpstan-ignore-next-line
-        $this->assertSame(
+        self::assertSame(
             $originatingEvent,
             $scriptEvent->getOriginatingEvent(),
             'getOriginatingEvent() SHOULD return test event'
         );
     }
 
-    public function testEventCalculatesNestedOriginatingEvent()
+    public function testEventCalculatesNestedOriginatingEvent(): void
     {
         $io = $this->getMockBuilder('Composer\IO\IOInterface')->getMock();
         $composer = $this->createComposerInstance();
@@ -55,23 +54,20 @@ class EventTest extends TestCase
         $scriptEvent = new Event('test', $composer, $io, true);
         $scriptEvent->setOriginatingEvent($intermediateEvent);
 
-        $this->assertNotSame(
+        self::assertNotSame(
             $intermediateEvent,
             $scriptEvent->getOriginatingEvent(),
             'getOriginatingEvent() SHOULD NOT return intermediate events'
         );
 
-        $this->assertSame(
+        self::assertSame(
             $originatingEvent,
             $scriptEvent->getOriginatingEvent(),
             'getOriginatingEvent() SHOULD return upper-most event'
         );
     }
 
-    /**
-     * @return Composer
-     */
-    private function createComposerInstance()
+    private function createComposerInstance(): Composer
     {
         $composer = new Composer;
         $config = new Config;

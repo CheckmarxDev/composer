@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -57,38 +57,36 @@ class PerforceDriverTest extends TestCase
      */
     protected $perforce;
 
-    const TEST_URL = 'TEST_PERFORCE_URL';
-    const TEST_DEPOT = 'TEST_DEPOT_CONFIG';
-    const TEST_BRANCH = 'TEST_BRANCH_CONFIG';
+    private const TEST_URL = 'TEST_PERFORCE_URL';
+    private const TEST_DEPOT = 'TEST_DEPOT_CONFIG';
+    private const TEST_BRANCH = 'TEST_BRANCH_CONFIG';
 
-    protected function setUp()
+    protected function setUp(): void
     {
-        $this->testPath = $this->getUniqueTmpDirectory();
+        $this->testPath = self::getUniqueTmpDirectory();
         $this->config = $this->getTestConfig($this->testPath);
-        $this->repoConfig = array(
+        $this->repoConfig = [
             'url' => self::TEST_URL,
             'depot' => self::TEST_DEPOT,
             'branch' => self::TEST_BRANCH,
-        );
+        ];
         $this->io = $this->getMockIOInterface();
-        $this->process = new ProcessExecutorMock;
+        $this->process = $this->getProcessExecutorMock();
         $this->httpDownloader = $this->getMockHttpDownloader();
         $this->perforce = $this->getMockPerforce();
         $this->driver = new PerforceDriver($this->repoConfig, $this->io, $this->config, $this->httpDownloader, $this->process);
         $this->overrideDriverInternalPerforce($this->perforce);
     }
 
-    protected function tearDown()
+    protected function tearDown(): void
     {
+        parent::tearDown();
         //cleanup directory under test path
         $fs = new Filesystem;
         $fs->removeDirectory($this->testPath);
     }
 
-    /**
-     * @return void
-     */
-    protected function overrideDriverInternalPerforce(Perforce $perforce)
+    protected function overrideDriverInternalPerforce(Perforce $perforce): void
     {
         $reflectionClass = new \ReflectionClass($this->driver);
         $property = $reflectionClass->getProperty('perforce');
@@ -96,15 +94,10 @@ class PerforceDriverTest extends TestCase
         $property->setValue($this->driver, $perforce);
     }
 
-    /**
-     * @param string $testPath
-     *
-     * @return Config
-     */
-    protected function getTestConfig($testPath)
+    protected function getTestConfig(string $testPath): Config
     {
         $config = new Config();
-        $config->merge(array('config' => array('home' => $testPath)));
+        $config->merge(['config' => ['home' => $testPath]]);
 
         return $config;
     }
@@ -130,26 +123,26 @@ class PerforceDriverTest extends TestCase
      */
     protected function getMockPerforce()
     {
-        $methods = array('p4login', 'checkStream', 'writeP4ClientSpec', 'connectClient', 'getComposerInformation', 'cleanupClientSpec');
+        $methods = ['p4login', 'checkStream', 'writeP4ClientSpec', 'connectClient', 'getComposerInformation', 'cleanupClientSpec'];
 
         return $this->getMockBuilder('Composer\Util\Perforce')->disableOriginalConstructor()->getMock();
     }
 
-    public function testInitializeCapturesVariablesFromRepoConfig()
+    public function testInitializeCapturesVariablesFromRepoConfig(): void
     {
         $driver = new PerforceDriver($this->repoConfig, $this->io, $this->config, $this->httpDownloader, $this->process);
         $driver->initialize();
-        $this->assertEquals(self::TEST_URL, $driver->getUrl());
-        $this->assertEquals(self::TEST_DEPOT, $driver->getDepot());
-        $this->assertEquals(self::TEST_BRANCH, $driver->getBranch());
+        self::assertEquals(self::TEST_URL, $driver->getUrl());
+        self::assertEquals(self::TEST_DEPOT, $driver->getDepot());
+        self::assertEquals(self::TEST_BRANCH, $driver->getBranch());
     }
 
-    public function testInitializeLogsInAndConnectsClient()
+    public function testInitializeLogsInAndConnectsClient(): void
     {
-        $this->perforce->expects($this->at(0))->method('p4Login');
-        $this->perforce->expects($this->at(1))->method('checkStream');
-        $this->perforce->expects($this->at(2))->method('writeP4ClientSpec');
-        $this->perforce->expects($this->at(3))->method('connectClient');
+        $this->perforce->expects($this->once())->method('p4Login');
+        $this->perforce->expects($this->once())->method('checkStream');
+        $this->perforce->expects($this->once())->method('writeP4ClientSpec');
+        $this->perforce->expects($this->once())->method('connectClient');
         $this->driver->initialize();
     }
 
@@ -157,44 +150,42 @@ class PerforceDriverTest extends TestCase
      * @depends testInitializeCapturesVariablesFromRepoConfig
      * @depends testInitializeLogsInAndConnectsClient
      */
-    public function testHasComposerFileReturnsFalseOnNoComposerFile()
+    public function testHasComposerFileReturnsFalseOnNoComposerFile(): void
     {
         $identifier = 'TEST_IDENTIFIER';
         $formatted_depot_path = '//' . self::TEST_DEPOT . '/' . $identifier;
-        $this->perforce->expects($this->any())->method('getComposerInformation')->with($this->equalTo($formatted_depot_path))->will($this->returnValue(array()));
+        $this->perforce->expects($this->any())->method('getComposerInformation')->with($this->equalTo($formatted_depot_path))->will($this->returnValue([]));
         $this->driver->initialize();
         $result = $this->driver->hasComposerFile($identifier);
-        $this->assertFalse($result);
+        self::assertFalse($result);
     }
 
     /**
      * @depends testInitializeCapturesVariablesFromRepoConfig
      * @depends testInitializeLogsInAndConnectsClient
      */
-    public function testHasComposerFileReturnsTrueWithOneOrMoreComposerFiles()
+    public function testHasComposerFileReturnsTrueWithOneOrMoreComposerFiles(): void
     {
         $identifier = 'TEST_IDENTIFIER';
         $formatted_depot_path = '//' . self::TEST_DEPOT . '/' . $identifier;
-        $this->perforce->expects($this->any())->method('getComposerInformation')->with($this->equalTo($formatted_depot_path))->will($this->returnValue(array('')));
+        $this->perforce->expects($this->any())->method('getComposerInformation')->with($this->equalTo($formatted_depot_path))->will($this->returnValue(['']));
         $this->driver->initialize();
         $result = $this->driver->hasComposerFile($identifier);
-        $this->assertTrue($result);
+        self::assertTrue($result);
     }
 
     /**
      * Test that supports() simply return false.
      *
      * @covers \Composer\Repository\Vcs\PerforceDriver::supports
-     *
-     * @return void
      */
-    public function testSupportsReturnsFalseNoDeepCheck()
+    public function testSupportsReturnsFalseNoDeepCheck(): void
     {
         $this->expectOutputString('');
-        $this->assertFalse(PerforceDriver::supports($this->io, $this->config, 'existing.url'));
+        self::assertFalse(PerforceDriver::supports($this->io, $this->config, 'existing.url'));
     }
 
-    public function testCleanup()
+    public function testCleanup(): void
     {
         $this->perforce->expects($this->once())->method('cleanupClientSpec');
         $this->driver->cleanup();

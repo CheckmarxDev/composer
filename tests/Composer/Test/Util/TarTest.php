@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -20,46 +20,46 @@ use Composer\Test\TestCase;
  */
 class TarTest extends TestCase
 {
-    public function testReturnsNullifTheTarIsNotFound()
+    public function testReturnsNullifTheTarIsNotFound(): void
     {
         $result = Tar::getComposerJson(__DIR__.'/Fixtures/Tar/invalid.zip');
 
-        $this->assertNull($result);
+        self::assertNull($result);
     }
 
-    public function testReturnsNullIfTheTarIsEmpty()
+    public function testReturnsNullIfTheTarIsEmpty(): void
     {
         $result = Tar::getComposerJson(__DIR__.'/Fixtures/Tar/empty.tar.gz');
-        $this->assertNull($result);
+        self::assertNull($result);
     }
 
-    public function testThrowsExceptionIfTheTarHasNoComposerJson()
+    public function testThrowsExceptionIfTheTarHasNoComposerJson(): void
     {
-        $this->setExpectedException('RuntimeException');
+        self::expectException('RuntimeException');
         Tar::getComposerJson(__DIR__.'/Fixtures/Tar/nojson.tar.gz');
     }
 
-    public function testThrowsExceptionIfTheComposerJsonIsInASubSubfolder()
+    public function testThrowsExceptionIfTheComposerJsonIsInASubSubfolder(): void
     {
-        $this->setExpectedException('RuntimeException');
+        self::expectException('RuntimeException');
         Tar::getComposerJson(__DIR__.'/Fixtures/Tar/subfolders.tar.gz');
     }
 
-    public function testReturnsComposerJsonInTarRoot()
+    public function testReturnsComposerJsonInTarRoot(): void
     {
         $result = Tar::getComposerJson(__DIR__.'/Fixtures/Tar/root.tar.gz');
-        $this->assertEquals("{\n    \"name\": \"foo/bar\"\n}\n", $result);
+        self::assertEquals("{\n    \"name\": \"foo/bar\"\n}\n", $result);
     }
 
-    public function testReturnsComposerJsonInFirstFolder()
+    public function testReturnsComposerJsonInFirstFolder(): void
     {
         $result = Tar::getComposerJson(__DIR__.'/Fixtures/Tar/folder.tar.gz');
-        $this->assertEquals("{\n    \"name\": \"foo/bar\"\n}\n", $result);
+        self::assertEquals("{\n    \"name\": \"foo/bar\"\n}\n", $result);
     }
 
-    public function testMultipleTopLevelDirsIsInvalid()
+    public function testMultipleTopLevelDirsIsInvalid(): void
     {
-        $this->setExpectedException('RuntimeException');
+        self::expectException('RuntimeException');
         Tar::getComposerJson(__DIR__.'/Fixtures/Tar/multiple.tar.gz');
     }
 }

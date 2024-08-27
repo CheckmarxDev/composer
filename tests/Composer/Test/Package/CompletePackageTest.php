@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -23,13 +23,13 @@ class CompletePackageTest extends TestCase
      *
      * demonstrates several versioning schemes
      */
-    public function providerVersioningSchemes()
+    public static function providerVersioningSchemes(): array
     {
-        $provider[] = array('foo',              '1-beta');
-        $provider[] = array('node',             '0.5.6');
-        $provider[] = array('li3',              '0.10');
-        $provider[] = array('mongodb_odm',      '1.0.0BETA3');
-        $provider[] = array('DoctrineCommon',   '2.2.0-DEV');
+        $provider[] = ['foo',              '1-beta'];
+        $provider[] = ['node',             '0.5.6'];
+        $provider[] = ['li3',              '0.10'];
+        $provider[] = ['mongodb_odm',      '1.0.0BETA3'];
+        $provider[] = ['DoctrineCommon',   '2.2.0-DEV'];
 
         return $provider;
     }
@@ -40,12 +40,12 @@ class CompletePackageTest extends TestCase
      * @param string $name
      * @param string $version
      */
-    public function testPackageHasExpectedNamingSemantics($name, $version)
+    public function testPackageHasExpectedNamingSemantics(string $name, string $version): void
     {
         $versionParser = new VersionParser();
         $normVersion = $versionParser->normalize($version);
         $package = new Package($name, $normVersion, $version);
-        $this->assertEquals(strtolower($name), $package->getName());
+        self::assertEquals(strtolower($name), $package->getName());
     }
 
     /**
@@ -54,13 +54,13 @@ class CompletePackageTest extends TestCase
      * @param string $name
      * @param string $version
      */
-    public function testPackageHasExpectedVersioningSemantics($name, $version)
+    public function testPackageHasExpectedVersioningSemantics(string $name, string $version): void
     {
         $versionParser = new VersionParser();
         $normVersion = $versionParser->normalize($version);
         $package = new Package($name, $normVersion, $version);
-        $this->assertEquals($version, $package->getPrettyVersion());
-        $this->assertEquals($normVersion, $package->getVersion());
+        self::assertEquals($version, $package->getPrettyVersion());
+        self::assertEquals($normVersion, $package->getVersion());
     }
 
     /**
@@ -69,39 +69,39 @@ class CompletePackageTest extends TestCase
      * @param string $name
      * @param string $version
      */
-    public function testPackageHasExpectedMarshallingSemantics($name, $version)
+    public function testPackageHasExpectedMarshallingSemantics(string $name, string $version): void
     {
         $versionParser = new VersionParser();
         $normVersion = $versionParser->normalize($version);
         $package = new Package($name, $normVersion, $version);
-        $this->assertEquals(strtolower($name).'-'.$normVersion, (string) $package);
+        self::assertEquals(strtolower($name).'-'.$normVersion, (string) $package);
     }
 
-    public function testGetTargetDir()
+    public function testGetTargetDir(): void
     {
         $package = new Package('a', '1.0.0.0', '1.0');
 
-        $this->assertNull($package->getTargetDir());
+        self::assertNull($package->getTargetDir());
 
         $package->setTargetDir('./../foo/');
-        $this->assertEquals('foo/', $package->getTargetDir());
+        self::assertEquals('foo/', $package->getTargetDir());
 
         $package->setTargetDir('foo/../../../bar/');
-        $this->assertEquals('foo/bar/', $package->getTargetDir());
+        self::assertEquals('foo/bar/', $package->getTargetDir());
 
         $package->setTargetDir('../..');
-        $this->assertEquals('', $package->getTargetDir());
+        self::assertEquals('', $package->getTargetDir());
 
         $package->setTargetDir('..');
-        $this->assertEquals('', $package->getTargetDir());
+        self::assertEquals('', $package->getTargetDir());
 
         $package->setTargetDir('/..');
-        $this->assertEquals('', $package->getTargetDir());
+        self::assertEquals('', $package->getTargetDir());
 
         $package->setTargetDir('/foo/..');
-        $this->assertEquals('foo/', $package->getTargetDir());
+        self::assertEquals('foo/', $package->getTargetDir());
 
         $package->setTargetDir('/foo/..//bar');
-        $this->assertEquals('foo/bar', $package->getTargetDir());
+        self::assertEquals('foo/bar', $package->getTargetDir());
     }
 }

@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -19,12 +19,12 @@ use Composer\Test\TestCase;
 
 class RequestTest extends TestCase
 {
-    public function testRequestInstall()
+    public function testRequestInstall(): void
     {
         $repo = new ArrayRepository;
-        $foo = $this->getPackage('foo', '1');
-        $bar = $this->getPackage('bar', '1');
-        $foobar = $this->getPackage('foobar', '1');
+        $foo = self::getPackage('foo', '1');
+        $bar = self::getPackage('bar', '1');
+        $foobar = self::getPackage('foobar', '1');
 
         $repo->addPackage($foo);
         $repo->addPackage($bar);
@@ -33,32 +33,32 @@ class RequestTest extends TestCase
         $request = new Request();
         $request->requireName('foo');
 
-        $this->assertEquals(
-            array(
+        self::assertEquals(
+            [
                 'foo' => new MatchAllConstraint(),
-            ),
+            ],
             $request->getRequires()
         );
     }
 
-    public function testRequestInstallSamePackageFromDifferentRepositories()
+    public function testRequestInstallSamePackageFromDifferentRepositories(): void
     {
         $repo1 = new ArrayRepository;
         $repo2 = new ArrayRepository;
 
-        $foo1 = $this->getPackage('foo', '1');
-        $foo2 = $this->getPackage('foo', '1');
+        $foo1 = self::getPackage('foo', '1');
+        $foo2 = self::getPackage('foo', '1');
 
         $repo1->addPackage($foo1);
         $repo2->addPackage($foo2);
 
         $request = new Request();
-        $request->requireName('foo', $constraint = $this->getVersionConstraint('=', '1'));
+        $request->requireName('foo', $constraint = self::getVersionConstraint('=', '1'));
 
-        $this->assertEquals(
-            array(
+        self::assertEquals(
+            [
                 'foo' => $constraint,
-            ),
+            ],
             $request->getRequires()
         );
     }

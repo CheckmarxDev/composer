@@ -1,8 +1,16 @@
 includes:
+    - ../vendor/phpstan/phpstan/conf/bleedingEdge.neon
     - ../vendor/phpstan/phpstan-phpunit/extension.neon
     - ../vendor/phpstan/phpstan-deprecation-rules/rules.neon
     - ../vendor/phpstan/phpstan-strict-rules/rules.neon
+    - ../vendor/phpstan/phpstan-symfony/extension.neon
+    - ../vendor/composer/pcre/extension.neon
+    - ../vendor/phpstan/phpstan-symfony/rules.neon
+    # TODO when requiring php 7.4+ we can use this
+    #- ../vendor/staabm/phpstan-todo-by/extension.neon
+    - ./rules.neon # Composer-specific PHPStan extensions, can be reused by third party packages by including 'vendor/composer/composer/phpstan/rules.neon' in your phpstan config
     - ./baseline.neon
+    - ./ignore-by-php-version.neon.php
 
 parameters:
     level: 8
@@ -10,12 +18,12 @@ parameters:
     excludePaths:
        - '../tests/Composer/Test/Fixtures/*'
        - '../tests/Composer/Test/Autoload/Fixtures/*'
+       - '../tests/Composer/Test/Autoload/MinimumVersionSupport/vendor/*'
        - '../tests/Composer/Test/Plugin/Fixtures/*'
-       - '../tests/Composer/Test/PolyfillTestCase.php'
-       # TODO Remove in 2.3
-       - '../src/Composer/Console/HtmlOutputFormatter.php'
 
     reportUnmatchedIgnoredErrors: false
+    treatPhpDocTypesAsCertain: false
+    reportPossiblyNonexistentConstantArrayOffset: true
 
     ignoreErrors:
         # unused parameters
@@ -30,15 +38,15 @@ parameters:
         - '~^Undefined variable: \$vendorDir$~'
         - '~^Undefined variable: \$baseDir$~'
 
-        # variable defined in eval
-        - '~^Undefined variable: \$res$~'
-
         # we don't have different constructors for parent/child
         - '~^Unsafe usage of new static\(\)\.$~'
 
-        # BC with older PHPUnit
-        - '~^Call to an undefined static method Composer\\Test\\PolyfillTestCase::setExpectedException\(\)\.$~'
-        - '~^Call to an undefined method Composer\\Test\\[a-zA-Z0-9\\]+::(assertFileDoesNotExist|assertMatchesRegularExpression)\(\)\.$~'
+        # Ignore some irrelevant errors in test files
+        - '~Method Composer\\Test\\[^:]+::(data\w+|provide\w+|\w+?Provider)\(\) (has no return type specified.|return type has no value type specified in iterable type array.)~'
+
+        # PHPUnit assertions as instance methods
+        - '~Dynamic call to static method PHPUnit\\Framework\\Assert::\w+\(\)~'
+        - '~Dynamic call to static method PHPUnit\\Framework\\TestCase::(once|atLeast|exactly|will|exactly|returnValue|returnCallback|any|atLeastOnce|throwException|onConsecutiveCalls|never|returnValueMap)\(\)~'
 
         # Mock errors
         - '~^Call to an undefined method (PHPUnit\\Framework\\MockObject\\MockObject|Prophecy\\Prophecy\\ObjectProphecy)::.*$~'
@@ -58,11 +66,11 @@ parameters:
         - ../src
         - ../tests
 
+    symfony:
+        consoleApplicationLoader: ../tests/console-application.php
+
     dynamicConstantNames:
         - Composer\Composer::BRANCH_ALIAS_VERSION
         - Composer\Composer::VERSION
         - Composer\Composer::RELEASE_DATE
         - Composer\Composer::SOURCE_VERSION
-
-rules:
-    - Composer\PHPStanRules\AnonymousFunctionWithThisRule

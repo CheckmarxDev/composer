@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -16,48 +16,46 @@ use Composer\Util\Platform;
 use ZipArchive;
 use Composer\Package\Archiver\ZipArchiver;
 
-class ZipArchiverTest extends ArchiverTest
+class ZipArchiverTest extends ArchiverTestCase
 {
     /**
-     * @param string $include
-     *
      * @dataProvider provideGitignoreExcludeNegationTestCases
      */
-    public function testGitignoreExcludeNegation($include)
+    public function testGitignoreExcludeNegation(string $include): void
     {
-        $this->testZipArchive(array(
+        $this->testZipArchive([
             'docs/README.md' => '# The doc',
             '.gitignore' => "/*\n.*\n!.git*\n$include",
-        ));
+        ]);
     }
 
-    public function provideGitignoreExcludeNegationTestCases()
+    public static function provideGitignoreExcludeNegationTestCases(): array
     {
-        return array(
-            array('!/docs'),
-            array('!/docs/'),
-        );
+        return [
+            ['!/docs'],
+            ['!/docs/'],
+        ];
     }
 
     /**
      * @param array<string, string> $files
      */
-    public function testZipArchive(array $files = array())
+    public function testZipArchive(array $files = []): void
     {
         if (!class_exists('ZipArchive')) {
             $this->markTestSkipped('Cannot run ZipArchiverTest, missing class "ZipArchive".');
         }
 
         if (empty($files)) {
-            $files = array(
+            $files = [
                 'file.txt' => null,
                 'foo/bar/baz' => null,
                 'x/baz' => null,
                 'x/includeme' => null,
-            );
+            ];
 
             if (!Platform::isWindows()) {
-                $files['foo' . getcwd() . '/file.txt'] = null;
+                $files['foo' . Platform::getCwd() . '/file.txt'] = null;
             }
         }
         // Set up repository
@@ -84,12 +82,10 @@ class ZipArchiverTest extends ArchiverTest
      * Create a local dummy repository to run tests against!
      *
      * @param array<string, string|null> $files
-     *
-     * @return void
      */
-    protected function setupDummyRepo(array &$files)
+    protected function setupDummyRepo(array &$files): void
     {
-        $currentWorkDir = getcwd();
+        $currentWorkDir = Platform::getCwd();
         chdir($this->testDir);
         foreach ($files as $path => $content) {
             if ($files[$path] === null) {
@@ -101,14 +97,7 @@ class ZipArchiverTest extends ArchiverTest
         chdir($currentWorkDir);
     }
 
-    /**
-     * @param string $path
-     * @param string $content
-     * @param string $currentWorkDir
-     *
-     * @return void
-     */
-    protected function writeFile($path, $content, $currentWorkDir)
+    protected function writeFile(string $path, string $content, string $currentWorkDir): void
     {
         if (!file_exists(dirname($path))) {
             mkdir(dirname($path), 0777, true);

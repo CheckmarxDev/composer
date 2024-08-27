@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -30,7 +30,7 @@ class MetapackageInstallerTest extends TestCase
      */
     private $io;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         $this->repository = $this->getMockBuilder('Composer\Repository\InstalledRepositoryInterface')->getMock();
 
@@ -39,7 +39,7 @@ class MetapackageInstallerTest extends TestCase
         $this->installer = new MetapackageInstaller($this->io);
     }
 
-    public function testInstall()
+    public function testInstall(): void
     {
         $package = $this->createPackageMock();
 
@@ -51,7 +51,7 @@ class MetapackageInstallerTest extends TestCase
         $this->installer->install($this->repository, $package);
     }
 
-    public function testUpdate()
+    public function testUpdate(): void
     {
         $initial = $this->createPackageMock();
         $initial->expects($this->once())
@@ -80,12 +80,12 @@ class MetapackageInstallerTest extends TestCase
 
         $this->installer->update($this->repository, $initial, $target);
 
-        $this->setExpectedException('InvalidArgumentException');
+        self::expectException('InvalidArgumentException');
 
         $this->installer->update($this->repository, $initial, $target);
     }
 
-    public function testUninstall()
+    public function testUninstall(): void
     {
         $package = $this->createPackageMock();
 
@@ -102,7 +102,7 @@ class MetapackageInstallerTest extends TestCase
 
         $this->installer->uninstall($this->repository, $package);
 
-        $this->setExpectedException('InvalidArgumentException');
+        self::expectException('InvalidArgumentException');
 
         $this->installer->uninstall($this->repository, $package);
     }
@@ -113,7 +113,7 @@ class MetapackageInstallerTest extends TestCase
     private function createPackageMock()
     {
         return $this->getMockBuilder('Composer\Package\Package')
-            ->setConstructorArgs(array(md5((string) mt_rand()), '1.0.0.0', '1.0.0'))
+            ->setConstructorArgs([bin2hex(random_bytes(5)), '1.0.0.0', '1.0.0'])
             ->getMock();
     }
 }

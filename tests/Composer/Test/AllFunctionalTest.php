@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -14,6 +14,7 @@ namespace Composer\Test;
 
 use Composer\Pcre\Preg;
 use Composer\Util\Filesystem;
+use Composer\Util\Platform;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\Process\Process;
 
@@ -31,15 +32,16 @@ class AllFunctionalTest extends TestCase
      */
     private static $pharPath;
 
-    public function setUp()
+    public function setUp(): void
     {
-        $this->oldcwd = getcwd();
+        $this->oldcwd = Platform::getCwd();
 
         chdir(__DIR__.'/Fixtures/functional');
     }
 
-    public function tearDown()
+    protected function tearDown(): void
     {
+        parent::tearDown();
         if ($this->oldcwd) {
             chdir($this->oldcwd);
         }
@@ -51,18 +53,18 @@ class AllFunctionalTest extends TestCase
         }
     }
 
-    public static function setUpBeforeClass()
+    public static function setUpBeforeClass(): void
     {
         self::$pharPath = self::getUniqueTmpDirectory() . '/composer.phar';
     }
 
-    public static function tearDownAfterClass()
+    public static function tearDownAfterClass(): void
     {
         $fs = new Filesystem;
         $fs->removeDirectory(dirname(self::$pharPath));
     }
 
-    public function testBuildPhar()
+    public function testBuildPhar(): void
     {
         if (defined('HHVM_VERSION')) {
             $this->markTestSkipped('Building the phar does not work on HHVM.');
@@ -76,7 +78,7 @@ class AllFunctionalTest extends TestCase
         $ri = new \RecursiveIteratorIterator($it, \RecursiveIteratorIterator::SELF_FIRST);
 
         foreach ($ri as $file) {
-            $targetPath = $target . DIRECTORY_SEPARATOR . $ri->getSubPathName();
+            $targetPath = $target . DIRECTORY_SEPARATOR . $ri->getSubPathname();
             if ($file->isDir()) {
                 $fs->ensureDirectoryExists($targetPath);
             } else {
@@ -84,20 +86,15 @@ class AllFunctionalTest extends TestCase
             }
         }
 
-        // TODO in v2.3 always call with an array
-        if (method_exists('Symfony\Component\Process\Process', 'fromShellCommandline')) {
-            $proc = new Process(array((defined('PHP_BINARY') ? PHP_BINARY : 'php'), '-dphar.readonly=0', './bin/compile'), $target);
-        } else {
-            // @phpstan-ignore-next-line
-            $proc = new Process((defined('PHP_BINARY') ? escapeshellcmd(PHP_BINARY) : 'php').' -dphar.readonly=0 '.escapeshellarg('./bin/compile'), $target);
-        }
+        $proc = new Process([PHP_BINARY, '-dphar.readonly=0', './bin/compile'], $target);
         $exitcode = $proc->run();
 
-        if ($exitcode !== 0 || trim($proc->getOutput())) {
+        if ($exitcode !== 0 || trim($proc->getOutput()) !== '') {
             $this->fail($proc->getOutput());
         }
 
-        $this->assertFileExists(self::$pharPath);
+        self::assertFileExists(self::$pharPath);
+        copy(self::$pharPath, __DIR__.'/../../composer-test.phar');
     }
 
     /**
@@ -105,7 +102,7 @@ class AllFunctionalTest extends TestCase
      * @depends testBuildPhar
      * @param string $testFile
      */
-    public function testIntegration($testFile)
+    public function testIntegration(string $testFile): void
     {
         $testData = $this->parseTestFile($testFile);
         $this->testDir = self::getUniqueTmpDirectory();
@@ -118,23 +115,15 @@ class AllFunctionalTest extends TestCase
             $fs->copy($testFileSetupDir, $this->testDir);
         }
 
-        $env = array(
+        $env = [
             'COMPOSER_HOME' => $this->testDir.'home',
             'COMPOSER_CACHE_DIR' => $this->testDir.'cache',
-        );
+        ];
 
-        // TODO in v2.3 always call with an array
-        if (method_exists('Symfony\Component\Process\Process', 'fromShellCommandline')) {
-            $cmd = array((defined('PHP_BINARY') ? PHP_BINARY : 'php'), self::$pharPath, '--no-ansi', $testData['RUN']);
-            $proc = new Process($cmd, $this->testDir, $env, null, 300);
-        } else {
-            $cmd = (defined('PHP_BINARY') ? escapeshellcmd(PHP_BINARY) : 'php') .' '.escapeshellarg(self::$pharPath).' --no-ansi '.$testData['RUN'];
-            // @phpstan-ignore-next-line
-            $proc = new Process($cmd, $this->testDir, $env, null, 300);
-        }
+        $proc = Process::fromShellCommandline(escapeshellcmd(PHP_BINARY).' '.escapeshellarg(self::$pharPath).' --no-ansi '.$testData['RUN'], $this->testDir, $env, null, 300);
         $output = '';
 
-        $exitcode = $proc->run(function ($type, $buffer) use (&$output) {
+        $exitCode = $proc->run(static function ($type, $buffer) use (&$output): void {
             $output .= $buffer;
         });
 
@@ -148,17 +137,19 @@ class AllFunctionalTest extends TestCase
                     $line++;
                 }
                 if ($expected[$i] === '%') {
-                    Preg::isMatch('{%(.+?)%}', substr($expected, $i), $match);
+                    if (!Preg::isMatchStrictGroups('{%(.+?)%}', substr($expected, $i), $match)) {
+                        throw new \LogicException('Failed to match %...% in '.substr($expected, $i));
+                    }
                     $regex = $match[1];
 
                     if (Preg::isMatch('{'.$regex.'}', substr($output, $j), $match)) {
                         $i += strlen($regex) + 2;
-                        $j += strlen($match[0]);
+                        $j += strlen((string) $match[0]);
                         continue;
                     } else {
                         $this->fail(
                             'Failed to match pattern '.$regex.' at line '.$line.' / abs offset '.$i.': '
-                            .substr($output, $j, min(strpos($output, "\n", $j) - $j, 100)).PHP_EOL.PHP_EOL.
+                            .substr($output, $j, min(((int) strpos($output, "\n", $j)) - $j, 100)).PHP_EOL.PHP_EOL.
                             'Output:'.PHP_EOL.$output
                         );
                     }
@@ -166,8 +157,8 @@ class AllFunctionalTest extends TestCase
                 if ($expected[$i] !== $output[$j]) {
                     $this->fail(
                         'Output does not match expectation at line '.$line.' / abs offset '.$i.': '.PHP_EOL
-                        .'-'.substr($expected, $i, min(strpos($expected, "\n", $i) - $i, 100)).PHP_EOL
-                        .'+'.substr($output, $j, min(strpos($output, "\n", $j) - $j, 100)).PHP_EOL.PHP_EOL
+                        .'-'.substr($expected, $i, min(((int) strpos($expected, "\n", $i)) - $i, 100)).PHP_EOL
+                        .'+'.substr($output, $j, min(((int) strpos($output, "\n", $j)) - $j, 100)).PHP_EOL.PHP_EOL
                         .'Output:'.PHP_EOL.$output
                     );
                 }
@@ -176,40 +167,39 @@ class AllFunctionalTest extends TestCase
             }
         }
         if (isset($testData['EXPECT-REGEX'])) {
-            $this->assertRegExp($testData['EXPECT-REGEX'], $this->cleanOutput($output));
+            self::assertMatchesRegularExpression($testData['EXPECT-REGEX'], $this->cleanOutput($output));
         }
         if (isset($testData['EXPECT-REGEXES'])) {
             $cleanOutput = $this->cleanOutput($output);
             foreach (explode("\n", $testData['EXPECT-REGEXES']) as $regex) {
-                $this->assertRegExp($regex, $cleanOutput, 'Output: '.$output);
+                self::assertMatchesRegularExpression($regex, $cleanOutput, 'Output: '.$output);
             }
         }
         if (isset($testData['EXPECT-EXIT-CODE'])) {
-            $this->assertSame($testData['EXPECT-EXIT-CODE'], $exitcode);
+            self::assertSame($testData['EXPECT-EXIT-CODE'], $exitCode);
         }
     }
 
     /**
      * @return array<string, array<string>>
      */
-    public function getTestFiles()
+    public static function getTestFiles(): array
     {
-        $tests = array();
+        $tests = [];
         foreach (Finder::create()->in(__DIR__.'/Fixtures/functional')->name('*.test')->files() as $file) {
-            $tests[basename($file)] = array($file->getRealPath());
+            $tests[$file->getFilename()] = [(string) $file];
         }
 
         return $tests;
     }
 
     /**
-     * @param string $file
-     * @return array<string, int|string>
+     * @return array{RUN: string, EXPECT?: string, EXPECT-EXIT-CODE?: int, EXPECT-REGEX?: string, EXPECT-REGEXES?: string, TEST?: string}
      */
-    private function parseTestFile($file)
+    private function parseTestFile(string $file): array
     {
-        $tokens = Preg::split('#(?:^|\n*)--([A-Z-]+)--\n#', file_get_contents($file), -1, PREG_SPLIT_DELIM_CAPTURE);
-        $data = array();
+        $tokens = Preg::split('#(?:^|\n*)--([A-Z-]+)--\n#', (string) file_get_contents($file), -1, PREG_SPLIT_DELIM_CAPTURE);
+        $data = [];
         $section = null;
 
         foreach ($tokens as $token) {
@@ -261,14 +251,10 @@ class AllFunctionalTest extends TestCase
             throw new \RuntimeException('The test file must have a section named "EXPECT", "EXPECT-REGEX", or "EXPECT-REGEXES".');
         }
 
-        return $data;
+        return $data; // @phpstan-ignore return.type
     }
 
-    /**
-     * @param string $output
-     * @return string
-     */
-    private function cleanOutput($output)
+    private function cleanOutput(string $output): string
     {
         $processed = '';
 

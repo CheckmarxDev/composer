@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -24,7 +24,7 @@ use ReflectionProperty;
 
 class RemoteFilesystemTest extends TestCase
 {
-    public function testGetOptionsForUrl()
+    public function testGetOptionsForUrl(): void
     {
         $io = $this->getIOInterfaceMock();
         $io
@@ -33,11 +33,11 @@ class RemoteFilesystemTest extends TestCase
             ->willReturn(false)
         ;
 
-        $res = $this->callGetOptionsForUrl($io, array('http://example.org', array()));
-        $this->assertTrue(isset($res['http']['header']) && is_array($res['http']['header']), 'getOptions must return an array with headers');
+        $res = $this->callGetOptionsForUrl($io, ['http://example.org', []]);
+        self::assertTrue(isset($res['http']['header']) && is_array($res['http']['header']), 'getOptions must return an array with headers');
     }
 
-    public function testGetOptionsForUrlWithAuthorization()
+    public function testGetOptionsForUrlWithAuthorization(): void
     {
         $io = $this->getIOInterfaceMock();
         $io
@@ -48,10 +48,10 @@ class RemoteFilesystemTest extends TestCase
         $io
             ->expects($this->once())
             ->method('getAuthentication')
-            ->willReturn(array('username' => 'login', 'password' => 'password'))
+            ->willReturn(['username' => 'login', 'password' => 'password'])
         ;
 
-        $options = $this->callGetOptionsForUrl($io, array('http://example.org', array()));
+        $options = $this->callGetOptionsForUrl($io, ['http://example.org', []]);
 
         $found = false;
         foreach ($options['http']['header'] as $header) {
@@ -59,10 +59,10 @@ class RemoteFilesystemTest extends TestCase
                 $found = true;
             }
         }
-        $this->assertTrue($found, 'getOptions must have an Authorization header');
+        self::assertTrue($found, 'getOptions must have an Authorization header');
     }
 
-    public function testGetOptionsForUrlWithStreamOptions()
+    public function testGetOptionsForUrlWithStreamOptions(): void
     {
         $io = $this->getIOInterfaceMock();
         $io
@@ -74,21 +74,21 @@ class RemoteFilesystemTest extends TestCase
         $io
             ->expects($this->once())
             ->method('getAuthentication')
-            ->willReturn(array('username' => null, 'password' => null))
+            ->willReturn(['username' => null, 'password' => null])
         ;
 
-        $streamOptions = array('ssl' => array(
+        $streamOptions = ['ssl' => [
             'allow_self_signed' => true,
-        ));
+        ]];
 
-        $res = $this->callGetOptionsForUrl($io, array('https://example.org', array()), $streamOptions);
-        $this->assertTrue(
+        $res = $this->callGetOptionsForUrl($io, ['https://example.org', []], $streamOptions);
+        self::assertTrue(
             isset($res['ssl'], $res['ssl']['allow_self_signed']) && true === $res['ssl']['allow_self_signed'],
             'getOptions must return an array with a allow_self_signed set to true'
         );
     }
 
-    public function testGetOptionsForUrlWithCallOptionsKeepsHeader()
+    public function testGetOptionsForUrlWithCallOptionsKeepsHeader(): void
     {
         $io = $this->getIOInterfaceMock();
         $io
@@ -100,15 +100,15 @@ class RemoteFilesystemTest extends TestCase
         $io
             ->expects($this->once())
             ->method('getAuthentication')
-            ->willReturn(array('username' => null, 'password' => null))
+            ->willReturn(['username' => null, 'password' => null])
         ;
 
-        $streamOptions = array('http' => array(
+        $streamOptions = ['http' => [
             'header' => 'Foo: bar',
-        ));
+        ]];
 
-        $res = $this->callGetOptionsForUrl($io, array('https://example.org', $streamOptions));
-        $this->assertTrue(isset($res['http']['header']), 'getOptions must return an array with a http.header key');
+        $res = $this->callGetOptionsForUrl($io, ['https://example.org', $streamOptions]);
+        self::assertTrue(isset($res['http']['header']), 'getOptions must return an array with a http.header key');
 
         $found = false;
         foreach ($res['http']['header'] as $header) {
@@ -117,18 +117,18 @@ class RemoteFilesystemTest extends TestCase
             }
         }
 
-        $this->assertTrue($found, 'getOptions must have a Foo: bar header');
-        $this->assertGreaterThan(1, count($res['http']['header']));
+        self::assertTrue($found, 'getOptions must have a Foo: bar header');
+        self::assertGreaterThan(1, count($res['http']['header']));
     }
 
-    public function testCallbackGetFileSize()
+    public function testCallbackGetFileSize(): void
     {
         $fs = new RemoteFilesystem($this->getIOInterfaceMock(), $this->getConfigMock());
         $this->callCallbackGet($fs, STREAM_NOTIFY_FILE_SIZE_IS, 0, '', 0, 0, 20);
-        $this->assertAttributeEqualsCustom(20, 'bytesMax', $fs);
+        self::assertAttributeEqualsCustom(20, 'bytesMax', $fs);
     }
 
-    public function testCallbackGetNotifyProgress()
+    public function testCallbackGetNotifyProgress(): void
     {
         $io = $this->getIOInterfaceMock();
         $io
@@ -141,48 +141,50 @@ class RemoteFilesystemTest extends TestCase
         $this->setAttribute($fs, 'progress', true);
 
         $this->callCallbackGet($fs, STREAM_NOTIFY_PROGRESS, 0, '', 0, 10, 20);
-        $this->assertAttributeEqualsCustom(50, 'lastProgress', $fs);
+        self::assertAttributeEqualsCustom(50, 'lastProgress', $fs);
     }
 
-    public function testCallbackGetPassesThrough404()
+    /**
+     * @doesNotPerformAssertions
+     */
+    public function testCallbackGetPassesThrough404(): void
     {
         $fs = new RemoteFilesystem($this->getIOInterfaceMock(), $this->getConfigMock());
 
         $this->callCallbackGet($fs, STREAM_NOTIFY_FAILURE, 0, 'HTTP/1.1 404 Not Found', 404, 0, 0);
-        $this->assertTrue(true, 'callbackGet must pass through 404');
     }
 
-    public function testGetContents()
+    public function testGetContents(): void
     {
         $fs = new RemoteFilesystem($this->getIOInterfaceMock(), $this->getConfigMock());
 
-        $this->assertStringContainsString('testGetContents', $fs->getContents('http://example.org', 'file://'.__FILE__));
+        self::assertStringContainsString('testGetContents', (string) $fs->getContents('http://example.org', 'file://'.__FILE__));
     }
 
-    public function testCopy()
+    public function testCopy(): void
     {
         $fs = new RemoteFilesystem($this->getIOInterfaceMock(), $this->getConfigMock());
 
-        $file = tempnam(sys_get_temp_dir(), 'c');
-        $this->assertTrue($fs->copy('http://example.org', 'file://'.__FILE__, $file));
-        $this->assertFileExists($file);
-        $this->assertStringContainsString('testCopy', file_get_contents($file));
+        $file = $this->createTempFile();
+        self::assertTrue($fs->copy('http://example.org', 'file://'.__FILE__, $file));
+        self::assertFileExists($file);
+        self::assertStringContainsString('testCopy', (string) file_get_contents($file));
         unlink($file);
     }
 
-    public function testCopyWithNoRetryOnFailure()
+    public function testCopyWithNoRetryOnFailure(): void
     {
-        $this->setExpectedException('Composer\Downloader\TransportException');
-        $fs = $this->getRemoteFilesystemWithMockedMethods(array('getRemoteContents'));
+        self::expectException('Composer\Downloader\TransportException');
+        $fs = $this->getRemoteFilesystemWithMockedMethods(['getRemoteContents']);
 
         $fs->expects($this->once())->method('getRemoteContents')
-            ->willReturnCallback(function ($originUrl, $fileUrl, $ctx, &$http_response_header) {
-                $http_response_header = array('http/1.1 401 unauthorized');
+            ->willReturnCallback(static function ($originUrl, $fileUrl, $ctx, &$http_response_header): string {
+                $http_response_header = ['http/1.1 401 unauthorized'];
 
                 return '';
             });
 
-        $file = tempnam(sys_get_temp_dir(), 'z');
+        $file = $this->createTempFile();
         unlink($file);
 
         $fs->copy(
@@ -190,51 +192,50 @@ class RemoteFilesystemTest extends TestCase
             'file://' . __FILE__,
             $file,
             true,
-            array('retry-auth-failure' => false)
+            ['retry-auth-failure' => false]
         );
     }
 
-    public function testCopyWithSuccessOnRetry()
+    public function testCopyWithSuccessOnRetry(): void
     {
-        $authHelper = $this->getAuthHelperWithMockedMethods(array('promptAuthIfNeeded'));
-        $fs = $this->getRemoteFilesystemWithMockedMethods(array('getRemoteContents'), $authHelper);
+        $authHelper = $this->getAuthHelperWithMockedMethods(['promptAuthIfNeeded']);
+        $fs = $this->getRemoteFilesystemWithMockedMethods(['getRemoteContents'], $authHelper);
 
         $authHelper->expects($this->once())
             ->method('promptAuthIfNeeded')
-            ->willReturn(array(
+            ->willReturn([
                 'storeAuth' => true,
                 'retry' => true,
-            ));
+            ]);
 
-        $fs->expects($this->at(0))
+        $counter = 0;
+        $fs->expects($this->exactly(2))
             ->method('getRemoteContents')
-            ->willReturnCallback(function ($originUrl, $fileUrl, $ctx, &$http_response_header) {
-                $http_response_header = array('http/1.1 401 unauthorized');
+            ->willReturnCallback(static function ($originUrl, $fileUrl, $ctx, &$http_response_header) use (&$counter) {
+                if ($counter++ === 0) {
+                    $http_response_header = ['http/1.1 401 unauthorized'];
 
-                return '';
+                    return '';
+                } else {
+                    $http_response_header = ['http/1.1 200 OK'];
+
+                    return '<?php $copied = "Copied"; ';
+                }
             });
 
-        $fs->expects($this->at(1))
-            ->method('getRemoteContents')
-            ->willReturnCallback(function ($originUrl, $fileUrl, $ctx, &$http_response_header) {
-                $http_response_header = array('http/1.1 200 OK');
-
-                return '<?php $copied = "Copied"; ';
-            });
-
-        $file = tempnam(sys_get_temp_dir(), 'z');
+        $file = $this->createTempFile();
 
         $copyResult = $fs->copy(
             'http://example.org',
             'file://' . __FILE__,
             $file,
             true,
-            array('retry-auth-failure' => true)
+            ['retry-auth-failure' => true]
         );
 
-        $this->assertTrue($copyResult);
-        $this->assertFileExists($file);
-        $this->assertStringContainsString('Copied', file_get_contents($file));
+        self::assertTrue($copyResult);
+        self::assertFileExists($file);
+        self::assertStringContainsString('Copied', (string) file_get_contents($file));
 
         unlink($file);
     }
@@ -242,26 +243,22 @@ class RemoteFilesystemTest extends TestCase
     /**
      * @group TLS
      */
-    public function testGetOptionsForUrlCreatesSecureTlsDefaults()
+    public function testGetOptionsForUrlCreatesSecureTlsDefaults(): void
     {
         $io = $this->getIOInterfaceMock();
 
-        $res = $this->callGetOptionsForUrl($io, array('example.org', array('ssl' => array('cafile' => '/some/path/file.crt'))), array(), 'http://www.example.org');
+        $res = $this->callGetOptionsForUrl($io, ['example.org', ['ssl' => ['cafile' => '/some/path/file.crt']]], [], 'http://www.example.org');
 
-        $this->assertTrue(isset($res['ssl']['ciphers']));
-        $this->assertMatchesRegularExpression('|!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA|', $res['ssl']['ciphers']);
-        $this->assertTrue($res['ssl']['verify_peer']);
-        $this->assertTrue($res['ssl']['SNI_enabled']);
-        $this->assertEquals(7, $res['ssl']['verify_depth']);
-        if (PHP_VERSION_ID < 50600) {
-            $this->assertEquals('www.example.org', $res['ssl']['CN_match']);
-            $this->assertEquals('www.example.org', $res['ssl']['SNI_server_name']);
-        }
-        $this->assertEquals('/some/path/file.crt', $res['ssl']['cafile']);
+        self::assertTrue(isset($res['ssl']['ciphers']));
+        self::assertMatchesRegularExpression('|!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA|', $res['ssl']['ciphers']);
+        self::assertTrue($res['ssl']['verify_peer']);
+        self::assertTrue($res['ssl']['SNI_enabled']);
+        self::assertEquals(7, $res['ssl']['verify_depth']);
+        self::assertEquals('/some/path/file.crt', $res['ssl']['cafile']);
         if (version_compare(PHP_VERSION, '5.4.13') >= 0) {
-            $this->assertTrue($res['ssl']['disable_compression']);
+            self::assertTrue($res['ssl']['disable_compression']);
         } else {
-            $this->assertFalse(isset($res['ssl']['disable_compression']));
+            self::assertFalse(isset($res['ssl']['disable_compression']));
         }
     }
 
@@ -270,23 +267,22 @@ class RemoteFilesystemTest extends TestCase
      *
      * @return string[][]
      */
-    public function provideBitbucketPublicDownloadUrls()
+    public static function provideBitbucketPublicDownloadUrls(): array
     {
-        return array(
-            array('https://bitbucket.org/seldaek/composer-live-test-repo/downloads/composer-unit-test-download-me.txt', '1234'),
-        );
+        return [
+            ['https://bitbucket.org/seldaek/composer-live-test-repo/downloads/composer-unit-test-download-me.txt', '1234'],
+        ];
     }
 
     /**
      * Tests that a BitBucket public download is correctly retrieved.
      *
-     * @param string $url
-     * @param string $contents
      * @dataProvider provideBitbucketPublicDownloadUrls
+     * @param non-empty-string $url
+     * @requires PHP 7.4.17
      */
-    public function testBitBucketPublicDownload($url, $contents)
+    public function testBitBucketPublicDownload(string $url, string $contents): void
     {
-        /** @var ConsoleIO $io */
         $io = $this
             ->getMockBuilder('Composer\IO\ConsoleIO')
             ->disableOriginalConstructor()
@@ -297,17 +293,17 @@ class RemoteFilesystemTest extends TestCase
 
         $result = $rfs->getContents($hostname, $url, false);
 
-        $this->assertEquals($contents, $result);
+        self::assertEquals($contents, $result);
     }
 
     /**
      * Tests that a BitBucket public download is correctly retrieved when `bitbucket-oauth` is configured.
      *
-     * @param string $url
-     * @param string $contents
      * @dataProvider provideBitbucketPublicDownloadUrls
+     * @param non-empty-string $url
+     * @requires PHP 7.4.17
      */
-    public function testBitBucketPublicDownloadWithAuthConfigured($url, $contents)
+    public function testBitBucketPublicDownloadWithAuthConfigured(string $url, string $contents): void
     {
         /** @var MockObject|ConsoleIO $io */
         $io = $this
@@ -315,41 +311,39 @@ class RemoteFilesystemTest extends TestCase
             ->disableOriginalConstructor()
             ->getMock();
 
-        $domains = array();
+        $domains = [];
         $io
             ->method('hasAuthentication')
-            ->willReturnCallback(function ($arg) use (&$domains) {
+            ->willReturnCallback(static function ($arg) use (&$domains): bool {
                 $domains[] = $arg;
                 // first time is called with bitbucket.org, then it redirects to bbuseruploads.s3.amazonaws.com so next time we have no auth configured
                 return $arg === 'bitbucket.org';
             });
         $io
-            ->expects($this->at(1))
-            ->method('getAuthentication')
+        ->method('getAuthentication')
             ->with('bitbucket.org')
-            ->willReturn(array(
+            ->willReturn([
                 'username' => 'x-token-auth',
                 // This token is fake, but it matches a valid token's pattern.
                 'password' => '1A0yeK5Po3ZEeiiRiMWLivS0jirLdoGuaSGq9NvESFx1Fsdn493wUDXC8rz_1iKVRTl1GINHEUCsDxGh5lZ=',
-            ));
+            ]);
 
         $rfs = new RemoteFilesystem($io, $this->getConfigMock());
         $hostname = parse_url($url, PHP_URL_HOST);
 
         $result = $rfs->getContents($hostname, $url, false);
 
-        $this->assertEquals($contents, $result);
-        $this->assertEquals(array('bitbucket.org', 'bbuseruploads.s3.amazonaws.com'), $domains);
+        self::assertEquals($contents, $result);
+        self::assertEquals(['bitbucket.org', 'bbuseruploads.s3.amazonaws.com'], $domains);
     }
 
     /**
      * @param mixed[] $args
      * @param mixed[] $options
-     * @param string  $fileUrl
      *
      * @return mixed[]
      */
-    private function callGetOptionsForUrl(IOInterface $io, array $args = array(), array $options = array(), $fileUrl = '')
+    private function callGetOptionsForUrl(IOInterface $io, array $args = [], array $options = [], string $fileUrl = ''): array
     {
         $fs = new RemoteFilesystem($io, $this->getConfigMock(), $options);
         $ref = new ReflectionMethod($fs, 'getOptionsForUrl');
@@ -370,9 +364,9 @@ class RemoteFilesystemTest extends TestCase
         $config = $this->getMockBuilder('Composer\Config')->getMock();
         $config
             ->method('get')
-            ->willReturnCallback(function ($key) {
+            ->willReturnCallback(static function ($key) {
                 if ($key === 'github-domains' || $key === 'gitlab-domains') {
-                    return array();
+                    return [];
                 }
 
                 return null;
@@ -381,17 +375,7 @@ class RemoteFilesystemTest extends TestCase
         return $config;
     }
 
-    /**
-     * @param int    $notificationCode
-     * @param int    $severity
-     * @param string $message
-     * @param int    $messageCode
-     * @param int    $bytesTransferred
-     * @param int    $bytesMax
-     *
-     * @return void
-     */
-    private function callCallbackGet(RemoteFilesystem $fs, $notificationCode, $severity, $message, $messageCode, $bytesTransferred, $bytesMax)
+    private function callCallbackGet(RemoteFilesystem $fs, int $notificationCode, int $severity, string $message, int $messageCode, int $bytesTransferred, int $bytesMax): void
     {
         $ref = new ReflectionMethod($fs, 'callbackGet');
         $ref->setAccessible(true);
@@ -400,12 +384,9 @@ class RemoteFilesystemTest extends TestCase
 
     /**
      * @param object|string $object
-     * @param string        $attribute
      * @param mixed         $value
-     *
-     * @return void
      */
-    private function setAttribute($object, $attribute, $value)
+    private function setAttribute($object, string $attribute, $value): void
     {
         $attr = new ReflectionProperty($object, $attribute);
         $attr->setAccessible(true);
@@ -414,16 +395,13 @@ class RemoteFilesystemTest extends TestCase
 
     /**
      * @param mixed         $value
-     * @param string        $attribute
      * @param object|string $object
-     *
-     * @return void
      */
-    private function assertAttributeEqualsCustom($value, $attribute, $object)
+    private function assertAttributeEqualsCustom($value, string $attribute, $object): void
     {
         $attr = new ReflectionProperty($object, $attribute);
         $attr->setAccessible(true);
-        $this->assertSame($value, $attr->getValue($object));
+        self::assertSame($value, $attr->getValue($object));
     }
 
     /**
@@ -439,17 +417,17 @@ class RemoteFilesystemTest extends TestCase
      *
      * @return RemoteFilesystem|MockObject
      */
-    private function getRemoteFilesystemWithMockedMethods(array $mockedMethods, AuthHelper $authHelper = null)
+    private function getRemoteFilesystemWithMockedMethods(array $mockedMethods, ?AuthHelper $authHelper = null)
     {
         return $this->getMockBuilder('Composer\Util\RemoteFilesystem')
-            ->setConstructorArgs(array(
+            ->setConstructorArgs([
                 $this->getIOInterfaceMock(),
                 $this->getConfigMock(),
-                array(),
+                [],
                 false,
                 $authHelper,
-            ))
-            ->setMethods($mockedMethods)
+            ])
+            ->onlyMethods($mockedMethods)
             ->getMock();
     }
 
@@ -461,11 +439,11 @@ class RemoteFilesystemTest extends TestCase
     private function getAuthHelperWithMockedMethods(array $mockedMethods)
     {
         return $this->getMockBuilder('Composer\Util\AuthHelper')
-            ->setConstructorArgs(array(
+            ->setConstructorArgs([
                 $this->getIOInterfaceMock(),
                 $this->getConfigMock(),
-            ))
-            ->setMethods($mockedMethods)
+            ])
+            ->onlyMethods($mockedMethods)
             ->getMock();
     }
 }

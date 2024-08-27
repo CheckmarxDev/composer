@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types=1);
 
 /*
  * This file is part of Composer.
@@ -12,9 +12,7 @@
 
 namespace Composer\Test\Util;
 
-use Composer\Downloader\TransportException;
 use Composer\Util\GitHub;
-use Composer\Util\Http\Response;
 use Composer\Test\TestCase;
 
 /**
@@ -29,31 +27,19 @@ class GitHubTest extends TestCase
     /** @var string */
     private $origin = 'github.com';
 
-    public function testUsernamePasswordAuthenticationFlow()
+    public function testUsernamePasswordAuthenticationFlow(): void
     {
         $io = $this->getIOMock();
-        $io
-            ->expects($this->at(0))
-            ->method('writeError')
-            ->with($this->message)
-        ;
-        $io
-            ->expects($this->once())
-            ->method('askAndHideAnswer')
-            ->with('Token (hidden): ')
-            ->willReturn($this->password)
-        ;
+        $io->expects([
+            ['text' => $this->message],
+            ['ask' => 'Token (hidden): ', 'reply' => $this->password],
+        ]);
 
         $httpDownloader = $this->getHttpDownloaderMock();
-        $httpDownloader
-            ->expects($this->once())
-            ->method('get')
-            ->with(
-                $this->equalTo($url = sprintf('https://api.%s/', $this->origin)),
-                $this->anything()
-            )
-            ->willReturn(new Response(array('url' => $url), 200, array(), '{}'))
-        ;
+        $httpDownloader->expects(
+            [['url' => sprintf('https://api.%s/', $this->origin), 'body' => '{}']],
+            true
+        );
 
         $config = $this->getConfigMock();
         $config
@@ -69,25 +55,21 @@ class GitHubTest extends TestCase
 
         $github = new GitHub($io, $config, null, $httpDownloader);
 
-        $this->assertTrue($github->authorizeOAuthInteractively($this->origin, $this->message));
+        self::assertTrue($github->authorizeOAuthInteractively($this->origin, $this->message));
     }
 
-    public function testUsernamePasswordFailure()
+    public function testUsernamePasswordFailure(): void
     {
         $io = $this->getIOMock();
-        $io
-            ->expects($this->exactly(1))
-            ->method('askAndHideAnswer')
-            ->with('Token (hidden): ')
-            ->willReturn($this->password)
-        ;
+        $io->expects([
+            ['ask' => 'Token (hidden): ', 'reply' => $this->password],
+        ]);
 
         $httpDownloader = $this->getHttpDownloaderMock();
-        $httpDownloader
-            ->expects($this->exactly(1))
-            ->method('get')
-            ->will($this->throwException(new TransportException('', 401)))
-        ;
+        $httpDownloader->expects(
+            [['url' => sprintf('https://api.%s/', $this->origin), 'status' => 401]],
+            true
+        );
 
         $config = $this->getConfigMock();
         $config
@@ -98,21 +80,7 @@ class GitHubTest extends TestCase
 
         $github = new GitHub($io, $config, null, $httpDownloader);
 
-        $this->assertFalse($github->authorizeOAuthInteractively($this->origin));
-    }
-
-    /**
-     * @return \PHPUnit\Framework\MockObject\MockObject&\Composer\IO\ConsoleIO
-     */
-    private function getIOMock()
-    {
-        $io = $this
-            ->getMockBuilder('Composer\IO\ConsoleIO')
-            ->disableOriginalConstructor()
-            ->getMock()
-        ;
-
-        return $io;
+        self::assertFalse($github->authorizeOAuthInteractively($this->origin));
     }
 
     /**
@@ -121,20 +89,6 @@ class GitHubTest extends TestCase
     private function getConfigMock()
     {
         return $this->getMockBuilder('Composer\Config')->getMock();
-    }
-
-    /**
-     * @return \PHPUnit\Framework\MockObject\MockObject&\Composer\Util\HttpDownloader
-     */
-    private function getHttpDownloaderMock()
-    {
-        $httpDownloader = $this
-            ->getMockBuilder('Composer\Util\HttpDownloader')
-            ->disableOriginalConstructor()
-            ->getMock()
-        ;
-
-        return $httpDownloader;
     }
 
     /**
